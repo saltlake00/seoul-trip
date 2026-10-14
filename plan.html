@@ -44,7 +44,8 @@
 
   <footer class="wrap foot" id="foot"></footer>
 
-  <script src="data/board.js"></script>
+  <!-- 데이터는 자주 바뀐다. GitHub Pages가 10분 캐시를 걸어 예전 일정이 보이므로 매번 새로 받는다 -->
+  <script>document.write('<script src="data/board.js?t=' + Date.now() + '"><\/script>');</script>
   <script src="plan.js"></script>
 </body>
 </html>
