@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>서울 1박 2일</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow" id="eyebrow"></p>
+      <h1 id="title"></h1>
+      <p class="meta" id="meta"></p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card meetup" id="meetup"></section>
+
+    <nav class="tabs" id="tabs" aria-label="일자 선택"></nav>
+
+    <section class="map-box">
+      <div id="map" role="region" aria-label="이동 동선 지도"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section id="timeline"></section>
+
+    <section class="grid">
+      <div class="card" id="stay"></div>
+      <div class="card" id="transport"></div>
+    </section>
+
+    <section class="card" id="food"></section>
+
+    <section class="grid">
+      <div class="card" id="pending"></div>
+      <div class="card" id="checklist"></div>
+    </section>
+  </main>
+
+  <footer class="wrap foot" id="foot"></footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="data/trip.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
