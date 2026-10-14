@@ -20,7 +20,8 @@
 
   // ── 상단 ──
   document.title = T.title;
-  $("eyebrow").innerHTML = T.sample ? '<span class="badge warn">샘플 데이터</span>' : "";
+  $("eyebrow").innerHTML = T.sample ? '<span class="badge warn">샘플 데이터</span>'
+    : T.draft ? `<span class="badge warn">${esc(T.draft)}</span>` : "";
   $("title").textContent = T.title;
   const dateText = T.dates.end ? `${T.dates.start} ~ ${T.dates.end}` : T.dates.start;
   $("meta").textContent = `${dateText} · ${T.people}명 · 마지막 갱신 ${T.updated}`;
