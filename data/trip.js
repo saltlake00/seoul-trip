@@ -10,7 +10,7 @@
 window.TRIP = {
   title: "8인 서울 1박 2일",
   sample: true, // 실제 일정으로 바꾸면 false로 — 상단 "샘플" 배지가 사라진다
-  dates: { start: "날짜 미정", end: "" },
+  dates: { start: "11월 14일(토)", end: "15일(일)" },
   people: 8,
   updated: "2026-10-14",
 
