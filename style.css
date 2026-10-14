@@ -236,3 +236,22 @@ a { color: inherit; }
 
 .meeting + .meeting { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
 .mhead { margin-bottom: 4px; }
+
+/* ── 장소 소개 카드 (후보 펼치기) ── */
+.cand {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  margin-bottom: 8px; box-shadow: var(--shadow); overflow: hidden;
+}
+.cand > .crow { border: 0; box-shadow: none; margin: 0; border-radius: 0; cursor: pointer; list-style: none; }
+.cand > .crow::-webkit-details-marker { display: none; }
+.cand > .crow::after { content: "▾"; color: var(--muted); margin-left: -4px; transition: transform .15s; }
+.cand[open] > .crow::after { transform: rotate(180deg); }
+.cand.st-ok { border-left: 4px solid #16a34a; }
+.cand.st-out { opacity: .5; }
+.cemoji { font-size: 18px; margin-right: 6px; vertical-align: -2px; }
+.cdetail { padding: 4px 16px 16px; border-top: 1px dashed var(--line); }
+.cdesc { margin: 12px 0; font-size: 15px; line-height: 1.65; }
+.info { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+.irow { display: grid; grid-template-columns: 44px 1fr; gap: 10px; }
+.info dt { color: var(--muted); font-weight: 600; }
+.info dd { margin: 0; }

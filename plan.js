@@ -79,6 +79,21 @@
     if (b) { filter = b.dataset.t; renderCands(); }
   });
 
+  // 장소 소개 카드 — 대한민국 구석구석처럼 소개 + 기본 정보 + 지도 링크
+  function detail(c) {
+    const q = encodeURIComponent(c.map || c.name);
+    const rows = Object.entries(c.info || {})
+      .map(([k, v]) => `<div class="irow"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+    return `<div class="cdetail">
+      ${c.desc ? `<p class="cdesc">${esc(c.desc)}</p>` : ""}
+      ${rows ? `<dl class="info">${rows}</dl>` : ""}
+      <div class="btns">
+        <a class="btn" href="${c.link ? esc(c.link) : `https://map.naver.com/p/search/${q}`}" target="_blank" rel="noopener">네이버지도</a>
+        <a class="btn primary" href="https://map.kakao.com/?q=${q}" target="_blank" rel="noopener">카카오맵</a>
+      </div>
+    </div>`;
+  }
+
   function renderCands() {
     document.querySelectorAll(".chip").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === filter)));
     const list = B.candidates.filter((c) => filter === "전체" || c.type === filter);
@@ -89,18 +104,21 @@
       <div class="cgroup">
         <h3>${dayLabel(g.d)}</h3>
         ${g.items.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || (b.votes || 0) - (a.votes || 0))
-          .map((c) => `
-          <div class="crow st-${c.status === "확정" ? "ok" : c.status === "제외" ? "out" : "mid"}">
+          .map((c) => {
+            const st = c.status === "확정" ? "ok" : c.status === "제외" ? "out" : "mid";
+            const row = `
             <div class="cmain">
-              <div class="cname">${typeTag(c.type)}${esc(c.name)}</div>
+              <div class="cname">${c.emoji ? `<span class="cemoji">${c.emoji}</span>` : ""}${typeTag(c.type)}${esc(c.name)}</div>
               <div class="ksub">${[c.slot, won(c.budget), c.note].filter(Boolean).map(esc).join(" · ")}</div>
             </div>
             <div class="cside">
               ${pill(c.status, c.status === "확정" ? "green" : c.status === "투표 중" ? "yellow" : c.status === "제외" ? "" : "blue")}
               <div class="votes" title="추천 ${c.votes || 0}명"><i style="width:${((c.votes || 0) / maxVotes) * 100}%"></i></div>
               <span class="vnum">추천 ${c.votes || 0}</span>
-            </div>
-          </div>`).join("")}
+            </div>`;
+            if (!c.desc && !c.info) return `<div class="crow st-${st}">${row}</div>`;
+            return `<details class="cand st-${st}"><summary class="crow">${row}</summary>${detail(c)}</details>`;
+          }).join("")}
       </div>`).join("") || '<p class="muted">해당 분류의 후보가 없습니다.</p>';
   }
   renderCands();
