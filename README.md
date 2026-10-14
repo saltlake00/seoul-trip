@@ -2,7 +2,8 @@
 
 일정·동선·식당·교통을 한 페이지로 보여 주는 정적 사이트. GitHub Pages로 공유한다.
 
-- 일정 데이터: [`data/trip.js`](data/trip.js) — 이 파일만 고치면 된다
+- 일정 데이터: [`data/trip.js`](data/trip.js) → `index.html` (지도·타임라인)
+- 준비 현황 데이터: [`data/board.js`](data/board.js) → `plan.html` (결정 대기·예약 현황·후보 목록·회의 기록)
 - 회의 후 갱신 절차: [`docs/갱신-가이드.md`](docs/갱신-가이드.md)
 - 일행이 의견을 적을 노션 틀: [`docs/노션-틀.md`](docs/노션-틀.md)
 
@@ -14,6 +15,8 @@
 | `style.css` | 디자인 (휴대폰 우선, 다크 모드 지원) |
 | `app.js` | `trip.js`를 읽어 지도·타임라인·목록을 그린다 |
 | `data/trip.js` | 여행 데이터 |
+| `plan.html`, `plan.js` | 준비 현황 페이지 |
+| `data/board.js` | 준비 현황 데이터 (노션 정리 페이지를 옮긴 것) |
 
 지도는 Leaflet + OpenStreetMap(키 불필요)이고, 장소마다 카카오맵 길찾기 링크를 붙인다.
 
