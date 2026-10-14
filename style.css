@@ -110,6 +110,11 @@ a { color: inherit; }
 }
 .pin b { transform: rotate(45deg); color: #fff; font: 700 12px/1 "Pretendard Variable", sans-serif; }
 .pin.cand { opacity: .55; }
+/* 150m 안에 붙은 장소를 합친 핀 — 「1·2·3」 */
+.pin.multi {
+  width: auto; height: 24px; padding: 0 8px; border-radius: 12px; transform: none;
+  color: #fff; font: 700 12px/20px "Pretendard Variable", sans-serif; white-space: nowrap;
+}
 .leaflet-popup-content { font-family: "Pretendard Variable", sans-serif; font-size: 14px; margin: 12px 14px; }
 .leaflet-popup-content .btns { margin-top: 8px; }
 .leaflet-popup-content .btn { color: #191600; background: #f4f4f4; border-color: #ddd; }
@@ -122,7 +127,7 @@ a { color: inherit; }
 .day-head h2 { margin: 0; font-size: 22px; }
 .day-head .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .stop {
-  display: grid; grid-template-columns: 54px 1fr; gap: 12px;
+  display: grid; grid-template-columns: 22px 54px 1fr; gap: 10px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
   padding: 14px 16px; box-shadow: var(--shadow);
   cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
@@ -130,6 +135,13 @@ a { color: inherit; }
 .stop:hover { border-color: var(--muted); }
 .stop.cand { border-style: dashed; }
 .stop .time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.stop .end { font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+/* 지도 핀과 같은 번호 */
+.stop .num {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; font-size: 12px; font-weight: 700; line-height: 1;
+}
+.stop .num.cand { opacity: .55; }
 .stop .name { font-weight: 700; font-size: 16px; }
 .stop .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .type {

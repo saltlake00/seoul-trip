@@ -8,6 +8,7 @@
     집결: "#c2410c", 관광: "#2563eb", 식당: "#ea580c", 카페: "#92400e", 숙소: "#7c3aed", 해산: "#64748b"
   };
   const MOVE_ICON = { 도보: "🚶", 지하철: "🚇", 버스: "🚌", 택시: "🚕", 차량: "🚗" };
+  const span = (it) => it.end ? `${it.time}~${it.end}` : it.time; // end = 예상 종료 시각
   const css = getComputedStyle(document.documentElement);
   const DAY_COLOR = [css.getPropertyValue("--day1").trim(), css.getPropertyValue("--day2").trim(), "#059669", "#d97706"];
 
@@ -49,30 +50,43 @@
     L.polyline(pts, { color, weight: 4, opacity: .8, dashArray: "1 8", lineCap: "round" }).addTo(layers[di]);
     L.polyline(pts, { color, weight: 3, opacity: .35 }).addTo(layers[di]);
 
+    // 핀 번호 = 그 날 일정 순서(카드 번호와 같다). 숙소 일정은 번호 대신 아래 🛏 핀 하나로 그린다.
+    // 150m 안에 붙은 장소는 핀 하나로 합친다 — 용산역·아이파크몰처럼 겹쳐서 앞 번호가 가려지지 않게.
+    const groups = [];
     d.items.forEach((it, i) => {
-      if (it.type === "숙소" && !T.stay.exact) return; // 숙소는 아래에서 범위로 따로 그린다
-      const icon = L.divIcon({
-        className: "",
-        html: `<div class="pin ${it.status === "후보" ? "cand" : ""}" style="background:${color}"><b>${i + 1}</b></div>`,
-        iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26]
-      });
-      const mk = L.marker([it.lat, it.lng], { icon, title: it.name })
-        .bindPopup(`<b>${d.day}일차 ${esc(it.time)}</b><br>${esc(it.name)}
+      if (it.type === "숙소") return;
+      const g = groups.find((g) => L.latLng(g[0].it.lat, g[0].it.lng).distanceTo([it.lat, it.lng]) < 150);
+      if (g) g.push({ it, i }); else groups.push([{ it, i }]);
+    });
+    groups.forEach((g) => {
+      const first = g[0].it;
+      const label = g.map(({ i }) => i + 1).join("·");
+      const cand = g.every(({ it }) => it.status === "후보") ? "cand" : "";
+      const icon = g.length === 1
+        ? L.divIcon({ className: "", html: `<div class="pin ${cand}" style="background:${color}"><b>${label}</b></div>`,
+            iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] })
+        : L.divIcon({ className: "", html: `<div class="pin multi ${cand}" style="background:${color}">${label}</div>`,
+            // 지점 왼쪽에 붙인다 — 같은 곳의 다른 날 물방울 핀(지점 위쪽)과 겹치지 않게
+            iconSize: [16 + label.length * 8, 24], iconAnchor: [16 + label.length * 8 + 2, 12], popupAnchor: [-(8 + label.length * 4), -12] });
+      const mk = L.marker([first.lat, first.lng], { icon, title: g.map(({ it }) => it.name).join(" · "), zIndexOffset: g.length > 1 ? 300 : 0 })
+        .bindPopup(g.map(({ it, i }) => `<b>${i + 1}. ${d.day}일차 ${esc(span(it))}</b><br>${esc(it.name)}
           ${it.status === "후보" ? ' <span class="badge">후보</span>' : ""}
-          ${it.note ? `<br><span style="color:#666">${esc(it.note)}</span>` : ""}
-          ${linkBtns(it.name, it.lat, it.lng)}`)
+          ${it.note ? `<br><span style="color:#666">${esc(it.note)}</span>` : ""}`).join("<hr>")
+          + linkBtns(first.name, first.lat, first.lng))
         .addTo(layers[di]);
-      markerOf[`${di}-${i}`] = mk;
+      g.forEach(({ i }) => { markerOf[`${di}-${i}`] = mk; });
     });
   });
 
-  // 숙소: 개인 주소면 정확한 위치 대신 반경 300m만 표시
+  // 숙소: 🛏 핀은 늘 찍는다. 개인 주소면 핀은 동네 중심값이고 반경 300m 원을 같이 그린다.
   const s = T.stay;
-  const stayLayer = s.exact
-    ? L.marker([s.lat, s.lng]).bindPopup(`<b>숙소</b><br>${esc(s.name)}`)
-    : L.circle([s.lat, s.lng], { radius: 300, color: TYPE_COLOR.숙소, weight: 2, dashArray: "4 6", fillOpacity: .12 })
-        .bindPopup(`<b>숙소 (대략적 위치)</b><br>${esc(s.name)}`);
-  stayLayer.addTo(map);
+  const stayLayer = L.marker([s.lat, s.lng], {
+    title: "숙소", zIndexOffset: 500,
+    icon: L.divIcon({ className: "", html: `<div class="pin" style="background:${TYPE_COLOR.숙소}"><b>🛏</b></div>`,
+      iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] })
+  }).bindPopup(`<b>숙소${s.exact ? "" : " (대략적 위치)"}</b><br>${esc(s.name)}
+    ${s.exact ? "" : '<br><span style="color:#666">정확한 주소는 단톡방 공지 참고</span>'}`).addTo(map);
+  if (!s.exact) L.circle([s.lat, s.lng], { radius: 300, color: TYPE_COLOR.숙소, weight: 2, dashArray: "4 6", fillOpacity: .12 }).addTo(map);
 
   // ── 일자 탭 ──
   let current = "all";
@@ -100,7 +114,7 @@
     const bounds = L.latLngBounds([]);
     layers.forEach((lg, i) => {
       const on = key === "all" || key === i;
-      if (on) { lg.addTo(map); T.days[i].items.forEach((it) => bounds.extend([it.lat, it.lng])); }
+      if (on) { lg.addTo(map); T.days[i].items.forEach((it) => bounds.extend([it.lat, it.lng])); bounds.extend([s.lat, s.lng]); }
       else map.removeLayer(lg);
     });
     lastBounds = bounds;
@@ -112,7 +126,7 @@
 
   $("legend").innerHTML = T.days.map((d, i) =>
     `<span><i style="background:${DAY_COLOR[i % DAY_COLOR.length]}"></i>${d.day}일차 ${esc(d.title)}</span>`).join("")
-    + `<span><i style="background:${TYPE_COLOR.숙소};opacity:.5"></i>숙소 부근</span>`
+    + `<span>🛏 숙소${s.exact ? "" : " (대략 위치)"}</span>`
     + `<span class="muted">흐린 핀·점선 카드 = 후보</span>`;
 
   // ── 타임라인 ──
@@ -126,7 +140,9 @@
         ${it.move ? `<div class="move">${MOVE_ICON[it.move.mode] || "➡️"} ${esc(it.move.mode)}
           ${it.move.detail ? ` · ${esc(it.move.detail)}` : ""}${it.move.min ? ` · 약 ${it.move.min}분` : ""}</div>` : ""}
         <button class="stop ${it.status === "후보" ? "cand" : ""}" data-key="${di}-${i}">
-          <div class="time">${esc(it.time)}</div>
+          <div class="num ${it.status === "후보" ? "cand" : ""}"
+            style="background:${it.type === "숙소" ? TYPE_COLOR.숙소 : DAY_COLOR[di % DAY_COLOR.length]}">${it.type === "숙소" ? "🛏" : i + 1}</div>
+          <div class="time">${esc(it.time)}${it.end ? `<div class="end">~${esc(it.end)}</div>` : ""}</div>
           <div>
             <div class="name"><span class="type" style="background:${TYPE_COLOR[it.type] || "#555"}">${esc(it.type)}</span>${esc(it.name)}
               ${it.status === "후보" ? '<span class="badge">후보</span>' : ""}</div>
@@ -161,7 +177,7 @@
     .map((it) => ({ ...it, day: d.day })));
   $("food").innerHTML = `<h2>🍽️ 식당·카페</h2><ul class="food-list">${foods.map((f) => `
     <li><div><b>${esc(f.name)}</b> ${f.status === "후보" ? '<span class="badge">후보</span>' : ""}
-      <div class="muted" style="font-size:13px">${f.day}일차 ${esc(f.time)}${f.note ? " · " + esc(f.note) : ""}</div></div>
+      <div class="muted" style="font-size:13px">${f.day}일차 ${esc(span(f))}${f.note ? " · " + esc(f.note) : ""}</div></div>
       <div class="r">${esc(f.cost || "")}${f.reserve ? `<br>${esc(f.reserve)}` : ""}</div></li>`).join("")}</ul>`;
 
   // ── 결정 대기·준비물 ──
