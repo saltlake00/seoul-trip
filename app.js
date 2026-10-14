@@ -35,7 +35,10 @@
     ${linkBtns(m.place, m.lat, m.lng)}`;
 
   // ── 지도 ──
-  const map = L.map("map", { scrollWheelZoom: false, tap: true });
+  // ?og — 카카오톡·SNS 미리보기 이미지(og-map.jpg)를 찍는 모드. 지도만 화면 가득 그린다. docs/갱신-가이드.md 「미리보기 이미지」
+  const OG = new URLSearchParams(location.search).has("og");
+  if (OG) document.body.classList.add("og");
+  const map = L.map("map", { scrollWheelZoom: false, tap: true, zoomControl: !OG });
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -66,8 +69,10 @@
         ? L.divIcon({ className: "", html: `<div class="pin ${cand}" style="background:${color}"><b>${label}</b></div>`,
             iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] })
         : L.divIcon({ className: "", html: `<div class="pin multi ${cand}" style="background:${color}">${label}</div>`,
-            // 지점 왼쪽에 붙인다 — 같은 곳의 다른 날 물방울 핀(지점 위쪽)과 겹치지 않게
-            iconSize: [16 + label.length * 8, 24], iconAnchor: [16 + label.length * 8 + 2, 12], popupAnchor: [-(8 + label.length * 4), -12] });
+            // 지점 옆에 붙인다(1일차 왼쪽, 2일차 아래) — 같은 곳의 다른 날 핀과 겹치지 않게
+            iconSize: [16 + label.length * 8, 24],
+            iconAnchor: di % 2 ? [8 + label.length * 4, -4] : [16 + label.length * 8 + 2, 12],
+            popupAnchor: di % 2 ? [0, 4] : [-(8 + label.length * 4), -12] });
       const mk = L.marker([first.lat, first.lng], { icon, title: g.map(({ it }) => it.name).join(" · "), zIndexOffset: g.length > 1 ? 300 : 0 })
         .bindPopup(g.map(({ it, i }) => `<b>${i + 1}. ${d.day}일차 ${esc(span(it))}</b><br>${esc(it.name)}
           ${it.status === "후보" ? ' <span class="badge">후보</span>' : ""}
@@ -118,7 +123,11 @@
       else map.removeLayer(lg);
     });
     lastBounds = bounds;
-    map.fitBounds(bounds, { padding: [30, 30] });
+    if (OG) {
+      // 미리보기 이미지: 헤드리스 창은 처음 크기가 달라 fitBounds가 한 단계 멀게 잡는다 — 12단계로 고정하고 범례 상자만큼 민다
+      map.setView(bounds.getCenter(), 12, { animate: false });
+      map.panBy([-80, -12], { animate: false });
+    } else map.fitBounds(bounds, { padding: [30, 30] });
     document.querySelectorAll(".day").forEach((el) => {
       el.hidden = !(key === "all" || Number(el.dataset.day) === key);
     });
@@ -186,4 +195,13 @@
   $("foot").textContent = `마지막 갱신 ${T.updated} · 지도 데이터 © OpenStreetMap 기여자`;
 
   show("all");
+
+  if (OG) {
+    const box = document.createElement("div");
+    box.className = "og-legend";
+    box.innerHTML = `<b>${esc(T.title)}</b><span>${esc(dateText)}</span>`
+      + T.days.map((d, i) => `<span><i style="background:${DAY_COLOR[i % DAY_COLOR.length]}"></i>${d.day}일차 ${esc(d.title)}</span>`).join("")
+      + `<span>🛏 숙소</span>`;
+    $("map").appendChild(box);
+  }
 })();
