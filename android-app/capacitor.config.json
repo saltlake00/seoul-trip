@@ -1,0 +1,13 @@
+{
+  "appId": "io.github.saltlake00.seoultrip",
+  "appName": "서울 1박 2일",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#4f46e5"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>서울 1박 2일</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="dates"></p>
+      <h1 id="title"></h1>
+    </div>
+    <button class="icon-btn" id="open-settings" aria-label="알림 설정">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"/></svg>
+      <span class="dot" id="bell-dot" hidden></span>
+    </button>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <main>
+    <section class="view" id="view-plan">
+      <article class="now-card" id="now-card"></article>
+      <div class="seg" id="day-seg" role="tablist" aria-label="일자"></div>
+      <ol class="timeline" id="timeline"></ol>
+    </section>
+
+    <section class="view" id="view-map" hidden>
+      <div class="seg" id="map-seg" role="tablist" aria-label="지도 일자"></div>
+      <div id="map" aria-label="동선 지도"></div>
+      <p class="hint">핀을 누르면 장소 이름이 나옵니다. 지도는 인터넷이 필요합니다.</p>
+    </section>
+
+    <section class="view" id="view-info" hidden>
+      <div id="info"></div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="화면">
+    <button data-view="plan" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7Zm-2 8h14v10H5V10Zm2 2v2h4v-2H7Zm0 4v2h4v-2H7Z"/></svg>
+      일정
+    </button>
+    <button data-view="map">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+      지도
+    </button>
+    <button data-view="info">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2v6Zm0-8h-2V7h2v2Z"/></svg>
+      정보
+    </button>
+  </nav>
+
+  <dialog class="sheet" id="settings">
+    <form method="dialog" class="sheet-body">
+      <div class="sheet-head">
+        <h2>일정 알림</h2>
+        <button class="text-btn" value="close">닫기</button>
+      </div>
+      <p class="muted">이동이 필요한 일정은 <b>출발할 시각</b>(시작 − 이동 시간 − 여유)에, 나머지는 시작 전에 알립니다. 앱을 닫아도 울립니다. 단, 설정에서 「강제 중지」하면 울리지 않습니다.</p>
+      <fieldset class="chips" id="lead-chips">
+        <legend>여유 시간</legend>
+      </fieldset>
+      <div id="perm-status" class="perm"></div>
+      <button type="button" class="btn" id="test-alarm">10초 뒤 시험 알림</button>
+      <h3>예약된 알림 <span class="muted" id="sched-count"></span></h3>
+      <ul class="sched" id="sched-list"></ul>
+      <div class="info-card tips">
+        <h3>알림이 안 오거나 늦을 때</h3>
+        <ul class="small">
+          <li>설정 → 애플리케이션 → 서울 1박 2일 → 배터리 → <b>「제한 없음」</b></li>
+          <li>삼성: 설정 → 배터리 → 백그라운드 사용 제한 → <b>「사용하지 않는 앱 자동 절전」·「초절전 앱」 목록에서 빼기</b></li>
+          <li>설정 → 애플리케이션 → 서울 1박 2일 → <b>「알람 및 리마인더」 허용</b></li>
+          <li>최근 앱에서 밀어 닫는 것은 괜찮지만, 「강제 중지」는 예약을 지웁니다. 그랬다면 앱을 한 번 열면 다시 예약됩니다.</li>
+        </ul>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="data/trip.js"></script>
+  <script src="bundle.js"></script>
+</body>
+</html>

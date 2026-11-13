@@ -1,0 +1,83 @@
+# 안드로이드 앱(android-app/) APK 빌드. 결과는 실행 페이지의 artifact 「seoul-trip-apk」.
+# 서명: 저장소 비밀값 TRIP_KEYSTORE_B64·TRIP_KEYSTORE_PASSWORD가 있으면 그 고정 키, 없으면 실행마다 새 디버그 키
+#       (새 키로 서명한 APK는 기존 앱을 지워야 설치된다 — 알림 설정·예약도 같이 지워진다).
+name: android-apk
+
+on:
+  push:
+    branches: [main]
+    paths: ["android-app/**", "data/trip.js", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: android-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: 의존성
+        working-directory: android-app
+        run: npm ci
+
+      - name: 알림 계산 시험 (세 시간대)
+        working-directory: android-app
+        run: |
+          for tz in UTC America/New_York Asia/Seoul; do TZ=$tz node --test test/alarms.test.mjs; done
+
+      - name: 웹 자산 묶기 + cap sync
+        working-directory: android-app
+        run: |
+          node scripts/build.mjs
+          npx cap sync android
+
+      - name: 서명 키 풀기 (있을 때만)
+        env:
+          KS_B64: ${{ secrets.TRIP_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/trip.p12"
+            echo "TRIP_KEYSTORE=$RUNNER_TEMP/trip.p12" >> "$GITHUB_ENV"
+            echo "고정 키로 서명"
+          else
+            echo "::warning::TRIP_KEYSTORE_B64 비밀값이 없어 실행마다 바뀌는 디버그 키로 서명합니다."
+          fi
+
+      - name: APK 빌드
+        working-directory: android-app/android
+        env:
+          TRIP_KEYSTORE_PASSWORD: ${{ secrets.TRIP_KEYSTORE_PASSWORD }}
+        run: bash ./gradlew --no-daemon assembleDebug
+
+      - name: APK 확인
+        run: |
+          APK=android-app/android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          ls -l "$APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" | head -3
+          "$BT/aapt" dump permissions "$APK" | tee perms.txt
+          for p in POST_NOTIFICATIONS SCHEDULE_EXACT_ALARM RECEIVE_BOOT_COMPLETED; do grep -q "$p" perms.txt || { echo "::error::권한 없음 $p"; exit 1; }; done
+          mkdir -p out && cp "$APK" "out/seoul-trip-${GITHUB_SHA::7}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seoul-trip-apk
+          path: out/*.apk
+          if-no-files-found: error
+          retention-days: 30

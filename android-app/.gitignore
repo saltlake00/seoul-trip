@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# scripts/build.mjs가 만드는 것
+www/bundle.js
+www/data/
+www/vendor/
