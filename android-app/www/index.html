@@ -61,7 +61,7 @@
         <h2>일정 알림</h2>
         <button class="text-btn" value="close">닫기</button>
       </div>
-      <p class="muted">이동이 필요한 일정은 <b>출발 시각</b>(시작 − 이동 시간) 기준으로, 나머지는 시작 시각 기준으로 알립니다. 앱을 닫아도 울립니다. 단, 설정에서 「강제 중지」하면 울리지 않습니다.</p>
+      <p class="muted">일정 <b>시작 시각</b> 기준으로 알립니다. 알림에는 「예약 17:30 · 16:50 출발(택시 40분)」처럼 출발 시각도 함께 나옵니다. 앱을 닫아도 울리지만, 설정에서 「강제 중지」하면 울리지 않습니다.</p>
 
       <h3>몇 분 전에 알릴까요 <span class="muted small">여러 개 고를 수 있어요</span></h3>
       <div class="chips" id="lead-chips" role="group" aria-label="알림 시점"></div>
@@ -70,6 +70,8 @@
         <button type="button" class="btn secondary" id="lead-add">추가</button>
       </div>
       <p id="lead-note" class="muted small"></p>
+      <label class="switch row-switch"><input type="checkbox" id="depart-alarm"><span class="track" aria-hidden="true"></span>
+        <span class="lbl">이동이 있는 일정은 <b>출발 시각</b>에도 「지금 출발」 알림</span></label>
 
       <h3>어떻게 알릴까요 <span class="muted small">여러 개 고를 수 있어요</span></h3>
       <div class="chips" id="kind-chips" role="group" aria-label="알림 방식">
@@ -79,6 +81,9 @@
       </div>
       <p id="kind-note" class="muted small"></p>
       <div id="perm-status" class="perm"></div>
+      <h3>일정별 알림 <span class="muted small">안 갈 일정은 꺼 두세요</span></h3>
+      <div id="item-list"></div>
+
       <button type="button" class="btn" id="test-alarm">10초 뒤 시험 알림</button>
       <h3>예약된 알림 <span class="muted" id="sched-count"></span></h3>
       <ul class="sched" id="sched-list"></ul>

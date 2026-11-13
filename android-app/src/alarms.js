@@ -18,7 +18,7 @@ export function endOf(day, item) {
 // 알림 id: 일자*1000 + 순번*10 + 시점 칸(0~9). 앱 예약은 전부 1000 이상이고 시험 알림은 TEST_ID.
 // 다시 예약할 때는 앱이 예약한 것 전부를 지우고 넣으므로 순번이 바뀌어도 남는 것이 없다.
 export const TEST_ID = 1;
-export const MAX_LEADS = 10;
+export const MAX_LEADS = 9; // 칸 9는 출발 알림(DEPART_SLOT)
 export function alarmId(day, index, slot = 0) {
   return day.day * 1000 + index * 10 + slot;
 }
@@ -51,19 +51,26 @@ function mdKst(iso) {
   return `${m}/${d}`;
 }
 
-// 알림 시각. 이동 시간(move.min)이 있으면 「출발할 시각」 = 시작 − 이동 − 여유(lead),
-// 없으면 「시작 lead분 전」. 공연·예약처럼 늦으면 안 되는 일정을 시작 10분 전에 알리면 이미 늦는다(Codex 검토 13).
+// 알림 시각 = 시작 − lead분(시작 시각 기준, 사용자 요청 11-14 02:10).
+// 이동이 있는 일정은 시작 기준 알림이 출발 시각보다 늦을 수 있어(예: 아리아 17:30, 택시 40분 → 출발 16:50)
+// 출발 시각 알림을 따로 둔다(departAlarm). 공연·예약을 시작 10분 전에만 알리면 이미 늦는다(Codex 검토 13).
 export function alarmTime(day, item, lead) {
   const start = startOf(day, item);
   if (!start) return null;
   const travel = item.move && item.move.min ? item.move.min : 0;
-  return { start, travel, at: new Date(start.getTime() - (travel + lead) * 60000) };
+  return { start, travel, depart: travel ? new Date(start.getTime() - travel * 60000) : null, at: new Date(start.getTime() - lead * 60000) };
 }
 
-// 알림 제목. 이동이 있으면 출발 기준, 없으면 시작 기준.
-export function alarmTitle(item, travel, lead) {
-  if (travel) return lead === 0 ? `지금 출발 · ${item.name}` : `${lead}분 뒤 출발 · ${item.name}`;
-  return `${leadText(lead)} 시작 · ${item.name}`;
+// 일정 시각에 붙는 말: 예약이면 「예약」, 집결·해산은 그대로, 나머지는 「시작」.
+export function timeLabel(item) {
+  if (item.reserve) return "예약";
+  if (item.type === "집결" || item.type === "해산") return item.type;
+  return "시작";
+}
+
+// 알림 제목: 「웨스틴 조선 서울 아리아 (뷔페) · 예약 17:30」. lead는 본문 첫머리에 둔다.
+export function alarmTitle(item) {
+  return `${item.name} · ${timeLabel(item)} ${item.time}`;
 }
 
 // 예약할 알림 목록. trip: window.TRIP, now: Date, leads: 몇 분 전에 알릴지(여러 개), disabled: 끈 항목 키 Set.
@@ -89,30 +96,41 @@ export function mergeClose(list, minutes = 9) {
   return out.map(({ anchor, ...a }) => a);
 }
 
-export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = new Set(), mergeMin = 9 } = {}) {
+// 출발 알림 칸(시점 칸 0~8 다음).
+export const DEPART_SLOT = 9;
+
+// departAlarm: 이동이 있는 일정에 출발 시각 알림을 더할지(기본 켬).
+export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = new Set(), mergeMin = 9, departAlarm = true } = {}) {
   const list = normalizeLeads(leads ?? lead ?? 10);
   const out = [];
   for (const day of trip.days || []) {
     (day.items || []).forEach((item, i) => {
       if (disabled.has(itemKey(day, item))) return;
       const span = item.end ? `${item.time}~${item.end}` : item.time;
-      const mv = moveText(item.move);
-      // 늦게 도착한 알림(재부팅 복원 등)이 헷갈리지 않게 날짜와 절대 시각을 본문 앞에 둔다.
-      const body = [`${day.day}일차 ${mdKst(day.date)} ${span}`, mv && `${mv} 이동`, item.note].filter(Boolean).join(" · ");
+      const title = alarmTitle(item);
+      // 늦게 도착한 알림(재부팅 복원 등)이 헷갈리지 않게 날짜와 절대 시각을 본문에 둔다.
+      const when = `${day.day}일차 ${mdKst(day.date)} ${span}`;
+      const tail = [when, item.note].filter(Boolean).join(" · ");
+      const base = alarmTime(day, item, 0);
+      if (!base) return;
+      const departText = base.travel ? `${hmKst(base.depart)} 출발 (${moveText(item.move)})` : "";
       list.forEach((ld, slot) => {
         const t = alarmTime(day, item, ld);
-        if (!t) return;
         if (t.at.getTime() <= now.getTime()) return;
-        out.push({
-          id: alarmId(day, i, slot),
-          title: alarmTitle(item, t.travel, ld),
-          body,
-          largeBody: body,
-          at: t.at,
-          lead: ld,
-          extra: { day: day.day, index: i },
-        });
+        const head = ld === 0 ? "지금" : `${ld}분 전`;
+        const late = t.travel && t.at > t.depart;
+        const first = !t.travel ? head
+          : late ? `${head} · 출발 시각 ${hmKst(t.depart)} 지남! 바로 이동 (${moveText(item.move)})`
+          : `${head} · ${departText}`;
+        const body = `${first}\n${tail}`;
+        out.push({ id: alarmId(day, i, slot), title, body, largeBody: body, at: t.at, lead: ld, extra: { day: day.day, index: i } });
       });
+      // 출발 알림: 출발 시각에. 시작 기준 알림이 이미 출발 시각에 울리면(같은 시각) 겹치지 않게 뺀다.
+      if (departAlarm && base.travel && base.depart.getTime() > now.getTime()
+        && !list.some((ld) => ld === base.travel)) {
+        const body = `${timeLabel(item)} ${item.time} · ${moveText(item.move)}\n${tail}`;
+        out.push({ id: alarmId(day, i, DEPART_SLOT), title: `지금 출발 · ${item.name}`, body, largeBody: body, at: base.depart, lead: base.travel, depart: true, extra: { day: day.day, index: i } });
+      }
     });
   }
   return mergeClose(out.sort((a, b) => a.at - b.at), mergeMin);

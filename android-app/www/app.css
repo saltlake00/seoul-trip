@@ -165,13 +165,27 @@ main { padding: 0 16px; }
   font-size: 13px; font-weight: 700; text-decoration: none; padding: 6px 10px; border-radius: 10px;
   background: var(--surface-2); color: var(--ink);
 }
-.bell-toggle {
-  margin-left: auto; border: 0; background: var(--accent-soft); color: var(--accent);
-  border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 700; display: inline-flex; gap: 4px; align-items: center;
-}
-.bell-toggle[aria-pressed="false"] { background: var(--surface-2); color: var(--muted); text-decoration: line-through; }
+/* 알림 스위치(카드·설정 공용) */
+.switch { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent); flex: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track { position: relative; width: 40px; height: 24px; border-radius: 999px; background: var(--accent); transition: background .15s; flex: none; }
+.switch .track::after { content: ""; position: absolute; top: 3px; left: 19px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: left .15s; }
+.switch input:not(:checked) + .track { background: var(--line); }
+.switch input:not(:checked) + .track::after { left: 3px; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch.off { color: var(--muted); }
+.switch .lbl { order: -1; }
+.row-switch { margin: 6px 0 4px; width: 100%; justify-content: space-between; color: var(--ink); font-weight: 500; font-size: 14px; }
+.item-day { margin-bottom: 10px; }
+.item-day-head { display: flex; align-items: center; gap: 6px; padding: 6px 0; }
+.item-day-head .text-btn { font-size: 13px; padding: 4px 6px; }
+.item-day-head .text-btn:first-of-type { margin-left: auto; }
+.item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.item-row .t { flex: none; width: 44px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.item-row .n { flex: 1; min-width: 0; }
+.item-row .switch .lbl { display: none; }
+.item-row.off .t, .item-row.off .n { color: var(--muted); }
 .tl.past { opacity: .5; }
-.tl.past .bell-toggle { display: none; }
 .tl.current .card { border-color: var(--now); }
 .tl.current .node { border-color: var(--now); background: var(--now); box-shadow: 0 0 0 5px color-mix(in srgb, var(--now) 25%, transparent); }
 .tl.flash .card { animation: flash 1.4s; }

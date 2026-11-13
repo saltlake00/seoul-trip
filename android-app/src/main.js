@@ -28,6 +28,7 @@ const store = {
 let leads = normalizeLeads(store.get("leads", [30, 10]));        // 고른 시점(분 전)
 let leadOptions = normalizeLeads([...PRESET_LEADS, ...store.get("leadOptions", []), ...leads]); // 칩으로 보일 시점
 let kinds = Object.assign({ sound: true, vibrate: true, popup: true }, store.get("kinds", {})); // 알림 방식
+let departAlarm = store.get("departAlarm", true);                 // 이동 있는 일정은 출발 시각에도 알림
 let disabled = new Set(store.get("disabled", []));
 let checked = new Set(store.get("checked", []));                  // 챙긴 준비물
 
@@ -120,19 +121,28 @@ function renderTimeline() {
         ${extra ? `<p class="meta">${extra}</p>` : ""}
         <div class="actions">
           <a href="${kakaoTo(it)}" target="_blank" rel="noopener">길찾기</a>
-          <button class="bell-toggle" data-key="${esc(itemKey(d, it))}" aria-pressed="${on}" aria-label="이 일정 알림 ${on ? "끄기" : "켜기"}">🔔 알림</button>
+          ${isPast ? "" : switchHtml(itemKey(d, it), on)}
         </div>
       </div>
     </li>`;
   }).join("");
 }
-$("#timeline").addEventListener("click", (e) => {
-  const b = e.target.closest(".bell-toggle"); if (!b) return;
-  const k = b.dataset.key;
-  if (disabled.has(k)) disabled.delete(k); else disabled.add(k);
+
+// 일정별 알림 스위치. 카드와 설정 화면의 「일정별 알림」 목록이 같은 것을 쓴다.
+function switchHtml(key, on) {
+  return `<label class="switch${on ? "" : " off"}"><input type="checkbox" data-key="${esc(key)}" ${on ? "checked" : ""}>
+    <span class="track" aria-hidden="true"></span><span class="lbl">${on ? "알림 켬" : "알림 꺼짐"}</span></label>`;
+}
+function setItemAlarm(keys, on) {
+  for (const k of keys) { if (on) disabled.delete(k); else disabled.add(k); }
   store.set("disabled", [...disabled]);
   renderTimeline();
+  if ($("#settings").open) renderItemList();
   schedule();
+}
+$("#timeline").addEventListener("change", (e) => {
+  const k = e.target.dataset.key; if (k == null) return;
+  setItemAlarm([k], e.target.checked);
 });
 
 function jumpTo(day, index) {
@@ -311,7 +321,7 @@ function schedule() {
 }
 const OVERDUE_KEEP_MS = 30 * 60000; // 시각이 지났는데 아직 대기 중인 알림(절전으로 늦어진 것)은 30분 안이면 남긴다
 function computeList() {
-  const list = buildAlarms(T, { now: now(), leads, disabled });
+  const list = buildAlarms(T, { now: now(), leads, disabled, departAlarm });
   const prep = prepAlarm(T, { now: now(), checked });
   return prep ? [...list, prep].sort((a, b) => a.at - b.at) : list;
 }
@@ -414,6 +424,40 @@ $("#kind-chips").addEventListener("change", (e) => {
   renderKinds();
   schedule();
 });
+$("#depart-alarm").addEventListener("change", (e) => {
+  departAlarm = e.target.checked;
+  store.set("departAlarm", departAlarm);
+  schedule();
+});
+
+/* 일정별 알림 목록: 일자마다 모두 켜기/끄기, 항목마다 스위치. 지난 일정은 뺀다. */
+function renderItemList() {
+  const n = now();
+  $("#item-list").innerHTML = T.days.map((d) => {
+    const rows = d.items.map((it) => ({ it, key: itemKey(d, it), start: startOf(d, it) })).filter((r) => r.start > n);
+    if (!rows.length) return "";
+    const onCount = rows.filter((r) => !disabled.has(r.key)).length;
+    return `<div class="item-day">
+      <div class="item-day-head"><b>${d.day}일차</b> <span class="muted small">${onCount}/${rows.length}개 켬</span>
+        <button type="button" class="text-btn" data-all="${d.day}" data-on="1">모두 켜기</button>
+        <button type="button" class="text-btn" data-all="${d.day}" data-on="0">모두 끄기</button></div>
+      ${rows.map((r) => `<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}</span>
+        <span class="n">${esc(r.it.name)}${isCritical(r.it) ? ` <span class="chip must">놓치면 안 됨</span>` : ""}</span>
+        ${switchHtml(r.key, !disabled.has(r.key))}</div>`).join("")}
+    </div>`;
+  }).join("") || `<p class="muted small">남은 일정이 없습니다.</p>`;
+}
+$("#item-list").addEventListener("change", (e) => {
+  const k = e.target.dataset.key; if (k == null) return;
+  setItemAlarm([k], e.target.checked);
+});
+$("#item-list").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-all]"); if (!b) return;
+  const d = T.days.find((x) => x.day === +b.dataset.all);
+  const n = now();
+  const keys = d.items.filter((it) => startOf(d, it) > n).map((it) => itemKey(d, it));
+  setItemAlarm(keys, b.dataset.on === "1");
+});
 
 $("#test-alarm").addEventListener("click", async () => {
   if (!NATIVE) { alert("시험 알림은 설치한 앱에서만 됩니다."); return; }
@@ -424,7 +468,7 @@ $("#test-alarm").addEventListener("click", async () => {
   const ld = leads[leads.length - 1] ?? 10;
   await LocalNotifications.schedule({
     notifications: [{
-      id: TEST_ID, title: `시험 · ${alarmTitle(first, 0, ld)}`, body: "이렇게 일정 알림이 옵니다. 앱을 닫아 둬도 울립니다.",
+      id: TEST_ID, title: `시험 · ${alarmTitle(first)}`, body: `${ld === 0 ? "지금" : `${ld}분 전`} — 이렇게 일정 알림이 옵니다. 앱을 닫아 둬도 울립니다.`,
       ...(channelId ? { channelId } : {}), schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true },
     }],
   });
@@ -432,7 +476,11 @@ $("#test-alarm").addEventListener("click", async () => {
   setTimeout(() => { $("#test-alarm").textContent = "10초 뒤 시험 알림"; }, 12000);
 });
 
-$("#open-settings").addEventListener("click", () => { renderLeads(); renderKinds(); renderSched(); $("#settings").showModal(); });
+$("#open-settings").addEventListener("click", () => {
+  renderLeads(); renderKinds(); renderItemList(); renderSched();
+  $("#depart-alarm").checked = departAlarm;
+  $("#settings").showModal();
+});
 
 /* ---------- 시작 ---------- */
 function renderAll() { renderNow(); renderSeg(); renderTimeline(); }
