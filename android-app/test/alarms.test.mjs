@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import {
   buildAlarms, startOf, itemKey, nowAndNext, untilText, normalizeLeads, channelFor, TEST_ID,
-  isCritical, departState, prepAlarm, PREP_ID, DEPART_SLOT, alarmId,
+  isCritical, departState, prepAlarm, PREP_ID, DEPART_SLOT, alarmId, withDepartures,
 } from "../src/alarms.js";
 
 // 실제 data/trip.js를 읽는다. 시험용 가짜 데이터가 아니라 날짜 누락 같은 데이터 실수도 잡는다.
@@ -143,4 +143,29 @@ test("남은 시간 문구", () => {
   const now = kst("2026-11-14T10:00");
   assert.equal(untilText(kst("2026-11-14T10:35"), now), "35분 뒤");
   assert.equal(untilText(kst("2026-11-14T12:18"), now), "2시간 18분 뒤");
+});
+
+test("팀 기차: 1일차 첫 일정 「광주 : 광주→용산」 10:17, 2일차 16:08 해산은 「광주 : 용산→광주」로 바뀜", () => {
+  const before = TRIP.days[0].items.length;
+  const T2 = withDepartures(TRIP);
+  assert.equal(TRIP.days[0].items.length, before, "원본이 바뀌면 안 됨");
+  const first = T2.days[0].items[0];
+  assert.equal(first.name, "광주 : 광주→용산");
+  assert.equal(first.time, "10:17");
+  assert.ok(first.offMap && isCritical(first));
+  assert.equal(T2.days[0].items.length, before + 1);
+  const back = T2.days[1].items.filter((it) => it.time === "16:08");
+  assert.equal(back.length, 1, "16:08은 하나만");
+  assert.equal(back[0].name, "광주 : 용산→광주");
+  assert.ok(!back[0].offMap);
+  assert.equal(T2.days[1].items.length, TRIP.days[1].items.length);
+  const al = of(buildAlarms(T2, { now: BEFORE, leads: [30, 10], ...NOMERGE }), "광주→용산");
+  // 기차는 1시간 전이 항상 더해진다
+  assert.deepEqual(al.map((a) => a.at.toISOString()), [iso("2026-11-14T09:17"), iso("2026-11-14T09:47"), iso("2026-11-14T10:07")]);
+  const backAl = of(buildAlarms(T2, { now: BEFORE, leads: [30, 10], ...NOMERGE }), "용산→광주");
+  assert.deepEqual(backAl.map((a) => a.at.toISOString()), [iso("2026-11-15T15:08"), iso("2026-11-15T15:38"), iso("2026-11-15T15:58")]);
+  assert.ok(backAl[0].body.startsWith("60분 전"), backAl[0].body);
+  assert.equal(al[0].title, "광주 : 광주→용산 / 출발 10:17");
+  assert.equal(prepAlarm(T2, { now: kst("2026-11-14T02:00") }).at.toISOString(), iso("2026-11-14T07:17"));
+  assert.equal(nowAndNext(T2, kst("2026-11-14T09:00")).next.item.time, "10:17");
 });

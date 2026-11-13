@@ -41,4 +41,8 @@
     <!-- 일정 알림: Android 13+ 알림 표시 권한, Android 12+ 정확한 시각 알람(사용자가 설정에서 끌 수 있음) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- 지도 「내 위치」: 버튼을 눌렀을 때만 쓴다 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>

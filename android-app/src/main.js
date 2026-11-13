@@ -2,13 +2,14 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { App } from "@capacitor/app";
+import { Geolocation } from "@capacitor/geolocation";
 import L from "leaflet";
 import {
   buildAlarms, startOf, endOf, itemKey, nowAndNext, untilText, normalizeLeads, channelFor, alarmTitle,
-  isCritical, departState, prepAlarm, TEST_ID, MAX_LEADS,
+  isCritical, departState, prepAlarm, withDepartures, TEST_ID, MAX_LEADS,
 } from "./alarms.js";
 
-const T = window.TRIP;
+const T = withDepartures(window.TRIP); // 팀별 출발 기차를 그날 첫 일정으로 끼운 사본
 const NATIVE = Capacitor.isNativePlatform();
 // 기본 시점 칩. 직접 입력한 값은 칩으로 더해져 저장된다.
 const PRESET_LEADS = [10, 30];
@@ -170,13 +171,16 @@ function renderMap() {
       maxZoom: 19, attribution: "Tiles © Esri",
     }).addTo(map);
     mapLayer = L.layerGroup().addTo(map);
+    map.on("dragstart", () => { followMe = false; }); // 손으로 지도를 옮기면 따라가기를 멈춘다
   }
   mapLayer.clearLayers();
   const d = T.days[mapDay];
   const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#4f46e5";
-  const pts = d.items.map((it) => [it.lat, it.lng]);
-  L.polyline(pts, { color, weight: 4, opacity: .7, dashArray: "6 8" }).addTo(mapLayer);
-  d.items.forEach((it, i) => {
+  // 집에서 떠나는 기차(offMap)는 지도에서 뺀다 — 서울 동선 지도가 광주까지 넓어진다.
+  const onMap = d.items.filter((it) => !it.offMap);
+  const pts = onMap.map((it) => [it.lat, it.lng]);
+  L.polyline(pts, { color: getComputedStyle(document.documentElement).getPropertyValue(`--day${(mapDay % 2) + 1}`).trim() || color, weight: 4, opacity: .7, dashArray: "6 8" }).addTo(mapLayer);
+  onMap.forEach((it, i) => {
     const icon = L.divIcon({
       className: "", iconSize: [28, 28], iconAnchor: [14, 28],
       html: `<div class="pin" style="background: var(--t-${esc(it.type)}, ${color})"><span>${i + 1}</span></div>`,
@@ -196,6 +200,58 @@ $("#info").addEventListener("change", (e) => {
 $("#map-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   mapDay = +b.dataset.i; renderMap();
+});
+
+/* 내 위치: 버튼을 누를 때만 권한을 묻고, 지도 탭에 있는 동안만 따라간다. 위치는 저장·전송하지 않는다. */
+let meMarker = null, meCircle = null, watchId = null, followMe = false;
+function showMe(lat, lng, acc) {
+  if (!map) return;
+  const ll = [lat, lng];
+  if (!meMarker) {
+    meCircle = L.circle(ll, { radius: acc, color: "#2563eb", weight: 1, fillColor: "#3b82f6", fillOpacity: .12 }).addTo(map);
+    meMarker = L.marker(ll, { icon: L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [9, 9], html: `<div class="me-dot"></div>` }), zIndexOffset: 1000 }).addTo(map);
+  } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(acc); }
+  if (followMe) map.setView(ll, Math.max(map.getZoom(), 16));
+  $("#locate").classList.add("on");
+}
+function locErr(err) {
+  const msg = /denied|permission/i.test(String(err && (err.message || err)))
+    ? "위치 권한이 꺼져 있습니다. 설정 → 애플리케이션 → 서울 1박 2일 → 권한 → 위치를 허용해 주세요."
+    : "위치를 찾지 못했습니다. GPS(위치)가 켜져 있는지 확인해 주세요.";
+  $("#loc-note").textContent = msg; $("#loc-note").hidden = false;
+  $("#locate").classList.remove("on", "busy");
+}
+async function startLocate() {
+  $("#loc-note").hidden = true;
+  $("#locate").classList.add("busy");
+  followMe = true;
+  try {
+    if (NATIVE) {
+      let p = await Geolocation.checkPermissions();
+      if (p.location !== "granted" && p.coarseLocation !== "granted") p = await Geolocation.requestPermissions();
+      if (p.location !== "granted" && p.coarseLocation !== "granted") throw new Error("permission denied");
+      const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });
+      showMe(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      if (watchId == null) {
+        watchId = await Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 20000 }, (pos2, err) => {
+          if (pos2) showMe(pos2.coords.latitude, pos2.coords.longitude, pos2.coords.accuracy);
+        });
+      }
+    } else {
+      // 브라우저 미리보기
+      await new Promise((res, rej) => navigator.geolocation.getCurrentPosition((p2) => { showMe(p2.coords.latitude, p2.coords.longitude, p2.coords.accuracy); res(); }, rej, { enableHighAccuracy: true, timeout: 15000 }));
+    }
+  } catch (err) { locErr(err); }
+  $("#locate").classList.remove("busy");
+}
+async function stopLocate() {
+  followMe = false;
+  if (watchId != null) { try { await Geolocation.clearWatch({ id: watchId }); } catch { /* 무시 */ } watchId = null; }
+}
+$("#locate").addEventListener("click", () => {
+  // 이미 위치를 보고 있으면 내 위치로 다시 맞추기만 한다.
+  if (meMarker && watchId != null) { followMe = true; map.setView(meMarker.getLatLng(), Math.max(map.getZoom(), 16)); return; }
+  startLocate();
 });
 
 /* ---------- 정보 ---------- */
@@ -230,7 +286,7 @@ function showView(v) {
     if (b.dataset.view === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   }
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${v}`;
-  if (v === "map") renderMap();
+  if (v === "map") renderMap(); else stopLocate();
   if (v === "info") renderInfo();
   window.scrollTo(0, 0);
 }
@@ -372,8 +428,17 @@ async function doSchedule() {
 function renderSched() {
   $("#sched-count").textContent = `${lastScheduled.length}개 · ${schedState}`;
   $("#sched-count").className = /실패|불일치|권한/.test(schedState) ? "bad-text" : "muted";
+  // 날짜가 바뀌는 곳에 일자 머리줄을 넣어 1일차·2일차를 가른다.
+  let lastDate = "";
   $("#sched-list").innerHTML = lastScheduled.length
-    ? lastScheduled.map((a) => `<li><b>${mdw(new Date(a.at.getTime() + 9 * 3600000).toISOString().slice(0, 10))} ${hhmm(a.at)}</b><span>${esc(a.title)}</span></li>`).join("")
+    ? lastScheduled.map((a) => {
+      const dIso = new Date(a.at.getTime() + 9 * 3600000).toISOString().slice(0, 10);
+      const day = T.days.find((d) => d.date === dIso);
+      const head = dIso !== lastDate
+        ? `<li class="sched-day" style="--dc: var(--day${day ? ((day.day - 1) % 2) + 1 : 1})">${day ? `${day.day}일차 · ` : ""}${mdw(dIso)}</li>` : "";
+      lastDate = dIso;
+      return `${head}<li><b>${hhmm(a.at)}</b><span>${esc(a.title)}</span></li>`;
+    }).join("")
     : `<li class="muted">남은 알림이 없습니다.</li>`;
 }
 
@@ -382,7 +447,7 @@ function renderLeads() {
   $("#lead-chips").innerHTML = leadOptions.map((m) =>
     `<label><input type="checkbox" value="${m}" ${leads.includes(m) ? "checked" : ""}>${m === 0 ? "정각" : `${m}분 전`}</label>`).join("");
   $("#lead-note").textContent = leads.length
-    ? `일정마다 ${leads.length}번 울립니다. 이동이 있는 일정은 출발 시각 기준입니다.`
+    ? `일정마다 ${leads.length}번 울립니다(시작 시각 기준). 기차는 1시간 전 알림이 항상 더해집니다.`
     : "고른 시점이 없어 알림이 울리지 않습니다.";
   $("#lead-note").className = leads.length ? "muted small" : "bad-text small";
 }
@@ -437,8 +502,9 @@ function renderItemList() {
     const rows = d.items.map((it) => ({ it, key: itemKey(d, it), start: startOf(d, it) })).filter((r) => r.start > n);
     if (!rows.length) return "";
     const onCount = rows.filter((r) => !disabled.has(r.key)).length;
-    return `<div class="item-day">
-      <div class="item-day-head"><b>${d.day}일차</b> <span class="muted small">${onCount}/${rows.length}개 켬</span>
+    return `<div class="item-day" style="--dc: var(--day${((d.day - 1) % 2) + 1})">
+      <div class="item-day-band"><b>${d.day}일차</b><span>${mdw(d.date)} · ${esc(d.title)}</span></div>
+      <div class="item-day-head"><span class="muted small">${onCount}/${rows.length}개 켬</span>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="1">모두 켜기</button>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="0">모두 끄기</button></div>
       ${rows.map((r) => `<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}</span>

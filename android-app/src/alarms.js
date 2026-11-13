@@ -64,13 +64,14 @@ export function alarmTime(day, item, lead) {
 // 일정 시각에 붙는 말: 예약이면 「예약」, 집결·해산은 그대로, 나머지는 「시작」.
 export function timeLabel(item) {
   if (item.reserve) return "예약";
-  if (item.type === "집결" || item.type === "해산") return item.type;
+  if (item.type === "집결" || item.type === "출발" || item.type === "해산") return item.type;
   return "시작";
 }
 
 // 알림 제목: 「웨스틴 조선 서울 아리아 (뷔페) · 예약 17:30」. lead는 본문 첫머리에 둔다.
 export function alarmTitle(item) {
-  return `${item.name} · ${timeLabel(item)} ${item.time}`;
+  // 기차는 사용자가 정한 꼴 「광주 : 광주→용산 / 출발 10:17」
+  return `${item.name}${item.type === "출발" ? " / " : " · "}${timeLabel(item)} ${item.time}`;
 }
 
 // 예약할 알림 목록. trip: window.TRIP, now: Date, leads: 몇 분 전에 알릴지(여러 개), disabled: 끈 항목 키 Set.
@@ -98,6 +99,11 @@ export function mergeClose(list, minutes = 9) {
 
 // 출발 알림 칸(시점 칸 0~8 다음).
 export const DEPART_SLOT = 9;
+// 기차(type 「출발」)는 놓치면 끝이라 설정과 상관없이 1시간 전 알림을 더한다(사용자 요청 11-14 02:30).
+export const TRAIN_EXTRA_LEADS = [60];
+export function leadsFor(item, list) {
+  return item.type === "출발" ? normalizeLeads([...TRAIN_EXTRA_LEADS, ...list]) : list;
+}
 
 // departAlarm: 이동이 있는 일정에 출발 시각 알림을 더할지(기본 켬).
 export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = new Set(), mergeMin = 9, departAlarm = true } = {}) {
@@ -114,7 +120,8 @@ export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = ne
       const base = alarmTime(day, item, 0);
       if (!base) return;
       const departText = base.travel ? `${hmKst(base.depart)} 출발 (${moveText(item.move)})` : "";
-      list.forEach((ld, slot) => {
+      const mine = leadsFor(item, list);
+      mine.forEach((ld, slot) => {
         const t = alarmTime(day, item, ld);
         if (t.at.getTime() <= now.getTime()) return;
         const head = ld === 0 ? "지금" : `${ld}분 전`;
@@ -127,7 +134,7 @@ export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = ne
       });
       // 출발 알림: 출발 시각에. 시작 기준 알림이 이미 출발 시각에 울리면(같은 시각) 겹치지 않게 뺀다.
       if (departAlarm && base.travel && base.depart.getTime() > now.getTime()
-        && !list.some((ld) => ld === base.travel)) {
+        && !mine.some((ld) => ld === base.travel)) {
         const body = `${timeLabel(item)} ${item.time} · ${moveText(item.move)}\n${tail}`;
         out.push({ id: alarmId(day, i, DEPART_SLOT), title: `지금 출발 · ${item.name}`, body, largeBody: body, at: base.depart, lead: base.travel, depart: true, extra: { day: day.day, index: i } });
       }
@@ -136,10 +143,35 @@ export function buildAlarms(trip, { now = new Date(), leads, lead, disabled = ne
   return mergeClose(out.sort((a, b) => a.at - b.at), mergeMin);
 }
 
-// 놓치면 안 되는 일정: 예약이 걸렸거나(reserve), 집결·해산(기차), 메모에 「불가」「KTX」가 있는 것.
+// 팀별 출발 기차(trip.departures)를 그날 첫 일정으로 끼운 사본을 돌려준다. 원본은 바꾸지 않는다.
+// 끼운 항목은 type "출발", offMap(지도 제외). 시각순으로 다시 정렬한다.
+export function withDepartures(trip) {
+  const deps = trip.departures || [];
+  if (!deps.length) return trip;
+  const days = (trip.days || []).map((d) => {
+    const mine = deps.filter((x) => x.date === d.date);
+    if (!mine.length) return d;
+    let items = d.items.slice();
+    for (const x of mine) {
+      const item = {
+        time: x.time, end: x.end, type: "출발", name: `${x.team} : ${x.from}→${x.to}`,
+        lat: x.lat, lng: x.lng, note: [x.train, x.note].filter(Boolean).join(" · "), offMap: !!x.offMap,
+      };
+      // 같은 시각 항목(올 때 16:08 해산)은 이 이름으로 바꿔 한 번만 보이게 한다.
+      const same = items.findIndex((it) => it.time === x.time);
+      if (same >= 0) items[same] = { ...items[same], ...item, offMap: false };
+      else items.push(item);
+    }
+    items.sort((a, b) => a.time.localeCompare(b.time));
+    return { ...d, items };
+  });
+  return { ...trip, days };
+}
+
+// 놓치면 안 되는 일정: 예약이 걸렸거나(reserve), 집결·출발·해산(기차), 메모에 「불가」「KTX」가 있는 것.
 // 단체 여행에서 흔한 실수가 집결·출발 시각을 도착 시각으로 착각하는 것이라 화면에 따로 표시한다.
 export function isCritical(item) {
-  return !!(item.reserve || item.type === "집결" || item.type === "해산" || /불가|KTX|기차/.test(item.note || ""));
+  return !!(item.reserve || item.type === "집결" || item.type === "출발" || item.type === "해산" || /불가|KTX|기차/.test(item.note || ""));
 }
 
 // 출발 상태: 이동이 있는 일정의 출발 시각과 지금의 차이(분). 이동이 없으면 null.

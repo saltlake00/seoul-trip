@@ -8,10 +8,13 @@
   --accent: #4f46e5;
   --accent-ink: #ffffff;
   --accent-soft: #eef2ff;
+  --day1: #2563eb;
+  --day2: #db2777;
   --now: #10b981;
   --warn-bg: #fff7ed;
   --warn-ink: #9a3412;
   --t-집결: #475569;
+  --t-출발: #0f766e;
   --t-관광: #4f46e5;
   --t-식당: #ea580c;
   --t-카페: #a16207;
@@ -33,10 +36,13 @@
     --accent: #818cf8;
     --accent-ink: #0e0f13;
     --accent-soft: #23264a;
+    --day1: #3b82f6;
+    --day2: #ec4899;
     --now: #34d399;
     --warn-bg: #3a2414;
     --warn-ink: #fdba74;
     --t-집결: #94a3b8;
+    --t-출발: #5eead4;
     --t-관광: #818cf8;
     --t-식당: #fb923c;
     --t-카페: #eab308;
@@ -176,8 +182,19 @@ main { padding: 0 16px; }
 .switch.off { color: var(--muted); }
 .switch .lbl { order: -1; }
 .row-switch { margin: 6px 0 4px; width: 100%; justify-content: space-between; color: var(--ink); font-weight: 500; font-size: 14px; }
-.item-day { margin-bottom: 10px; }
-.item-day-head { display: flex; align-items: center; gap: 6px; padding: 6px 0; }
+/* 일자마다 따로 묶인 카드. 머리 띠 색으로 1일차·2일차를 가른다. */
+.item-day {
+  margin: 0 0 14px; border-radius: 16px; overflow: hidden;
+  background: var(--surface); border: 1.5px solid color-mix(in srgb, var(--dc) 35%, var(--line));
+}
+.item-day-band {
+  display: flex; align-items: baseline; gap: 8px; padding: 10px 14px;
+  background: var(--dc); color: #fff; font-size: 13px;
+}
+.item-day-band b { font-size: 16px; }
+.item-day-band span { opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-day-head { display: flex; align-items: center; gap: 6px; padding: 6px 14px; background: color-mix(in srgb, var(--dc) 7%, var(--surface)); }
+.item-day .item-row { padding-left: 14px; padding-right: 14px; }
 .item-day-head .text-btn { font-size: 13px; padding: 4px 6px; }
 .item-day-head .text-btn:first-of-type { margin-left: auto; }
 .item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
@@ -194,6 +211,18 @@ main { padding: 0 16px; }
 /* 지도 */
 #map { height: calc(100vh - 250px); min-height: 320px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 .hint { font-size: 12.5px; color: var(--muted); }
+.map-wrap { position: relative; }
+.locate {
+  position: absolute; right: 12px; top: 12px; z-index: 500;
+  display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px;
+  padding: 10px 14px; background: var(--surface); color: var(--ink); font-weight: 800; font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.2);
+}
+.locate.on { color: #2563eb; }
+.locate.busy svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.me-dot { width: 18px; height: 18px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); }
+.loc-note { margin: 8px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-ink); font-size: 13.5px; }
 .pin {
   width: 28px; height: 28px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
   display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3);
@@ -252,7 +281,11 @@ main { padding: 0 16px; }
 .perm button { margin-top: 8px; }
 .sched { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
 .sched li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
-.sched li b { font-variant-numeric: tabular-nums; flex: none; width: 116px; white-space: nowrap; }
+.sched li b { font-variant-numeric: tabular-nums; flex: none; width: 48px; white-space: nowrap; }
+.sched li.sched-day {
+  margin-top: 12px; padding: 6px 10px; border: 0; border-radius: 8px;
+  background: var(--dc); color: #fff; font-weight: 800; font-size: 13px;
+}
 
 .bad-text { color: var(--warn-ink); font-weight: 700; }
 .lead-add { display: flex; gap: 8px; margin: 4px 0 6px; }
