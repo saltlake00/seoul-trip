@@ -23,6 +23,7 @@
 ## 사용자가 할 것 (내가 못 한 것)
 
 1. ~~서명 키 비밀값 등록~~ — 11-14 등록 완료(`TRIP_KEYSTORE_B64`·`TRIP_KEYSTORE_PASSWORD`). Claude가 알아서 실행하면 자동 모드 분류기가 「Secret-Store Writes」로 막고, 사용자가 채팅에 명령을 직접 붙여 넣으면 통과했다. 등록 뒤 빌드부터 고정 키라, 그 전에 설치한 앱은 한 번 지우고 다시 설치한다.
+   - 배포: 카카오톡은 APK 전송을 막는다. GitHub 릴리스에 `seoul-trip.apk` 이름으로 올리면 `https://github.com/saltlake00/seoul-trip/releases/latest/download/seoul-trip.apk`가 늘 최신을 가리킨다(11-14 `app-e06d6a6` 첫 릴리스). 새 빌드는 `gh release create app-<sha> <apk> --target main`(sha를 target으로 주면 422).
 2. 폰에 설치하고 `docs/안드로이드-앱-계획.md` 10절 목록을 확인한다(권한, 시험 알림, 예약 개수, 알림 눌러 이동). **실기기 알림은 아직 아무도 확인하지 못했다.** 이 PC에는 adb(Android SDK platform-tools)가 없어서 Claude가 폰을 대신 볼 수 없다(11-14 확인). 화면을 끈 채 울리는지 같은 항목은 어차피 폰에서 사람이 봐야 한다.
 
 ## 다음 액션 후보
