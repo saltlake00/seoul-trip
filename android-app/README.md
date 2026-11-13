@@ -42,3 +42,18 @@ cd /e/GitHub/seoul-trip && base64 -w0 android-app/keystore/trip.p12 | gh secret 
 
 OSM 타일 서버는 앱(`https://localhost`) 요청을 막을 수 있어 Esri World Street Map을 쓴다.
 CARTO basemaps는 2026-11-14 확인 때 키 없이 「API KEY REQUIRED」 타일을 돌려줘서 뺐다.
+
+## 팀 기차 (`data/trip.js` → `departures`)
+
+- `{ team, from, to, train, date, time, end, lat, lng, offMap, note }`. 앱이 「광주 : 광주→용산 / 출발 10:17」 일정으로 그날 끼운다(`withDepartures`).
+- 같은 날 같은 시각 일정이 있으면(올 때 16:08 해산) 그 항목을 이 이름으로 바꿔 보여 준다. 웹 화면은 이 필드를 쓰지 않는다.
+- 기차는 설정과 상관없이 1시간 전 알림이 더해진다(`TRAIN_EXTRA_LEADS`).
+
+## 내 위치
+
+- `@capacitor/geolocation`. 플러그인 매니페스트가 비어 있어 `ACCESS_COARSE/FINE_LOCATION`은 앱 매니페스트에 직접 넣었다.
+- 지도 「내 위치」를 누를 때만 권한을 묻고, 지도 탭을 떠나면 추적을 멈춘다. 위치는 저장·전송하지 않는다.
+
+## 아이콘
+
+- `@capacitor/assets generate`는 Node 24에서 sharp 로드 오류로 실패했다(2026-11-14). 적응형 아이콘 전경을 벡터 XML(`res/drawable/ic_trip_foreground.xml`)로 직접 두고 배경색은 `values/ic_launcher_background.xml`. Android 8 미만은 기본 PNG 그대로.

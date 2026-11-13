@@ -116,7 +116,7 @@ function renderTimeline() {
       <span class="node"></span>
       <div class="card">
         ${mv}
-        <span class="chip">${esc(it.type)}</span>${isCritical(it) ? `<span class="chip must">놓치면 안 됨</span>` : ""}${it.status === "후보" ? `<span class="chip cand">후보</span>` : ""}
+        <span class="chip">${esc(it.type)}</span>${isCritical(it) ? `<span class="chip must">중요</span>` : ""}${it.status === "후보" ? `<span class="chip cand">후보</span>` : ""}
         <div class="head"><h3>${esc(it.name)}</h3></div>
         ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
         ${extra ? `<p class="meta">${extra}</p>` : ""}
@@ -331,44 +331,54 @@ async function ensurePermissions(ask) {
   renderPerm();
 }
 
-function renderPerm() {
-  const banner = $("#banner");
-  const box = $("#perm-status");
-  const dot = $("#bell-dot");
-  if (perm.display !== "granted") {
-    banner.hidden = false;
-    banner.innerHTML = `<span>알림 권한이 꺼져 있어 일정 알림이 울리지 않습니다.</span><button id="ask-perm">켜기</button>`;
-    box.className = "perm bad"; box.textContent = "알림 권한: 꺼짐";
-    dot.hidden = false;
-  } else if (perm.channelBlocked) {
-    banner.hidden = false;
-    banner.innerHTML = `<span>「${esc(channelFor(kinds).name)}」 알림 종류가 꺼져 있습니다. 설정 → 애플리케이션 → 서울 1박 2일 → 알림에서 켜 주세요.</span>`;
-    box.className = "perm bad"; box.textContent = "알림 종류 꺼짐 — 울리지 않음";
-    dot.hidden = false;
-  } else if (perm.exact === "denied") {
-    banner.hidden = false;
-    banner.innerHTML = `<span>「알람 및 리마인더」가 꺼져 있으면 알림이 몇 분 늦을 수 있습니다.</span><button id="ask-exact">설정</button>`;
-    box.className = "perm bad"; box.textContent = "정확한 시각 알림: 꺼짐 (늦게 울릴 수 있음)";
-    dot.hidden = false;
-  } else {
-    banner.hidden = true;
-    box.className = "perm"; box.textContent = NATIVE ? "알림 권한: 켜짐 · 정확한 시각 알림: 켜짐" : "브라우저 미리보기: 실제 알림은 앱에서만 예약됩니다.";
-    dot.hidden = true;
-  }
+/* 상태: 권한·채널·정확한 시각·예약 결과를 상태값 하나로 정해 시트 맨 위 카드와 홈 배너에 같이 보여 준다.
+   문구 정규식으로 색을 고르지 않는다(Codex 3차 검토: 「채널 꺼짐」이 경고로 안 걸렸다). */
+let sched = { kind: "preview", n: 0, missing: 0, err: "" }; // preview | ok | noperm | missing | fail
+function statusInfo() {
+  if (perm.display !== "granted") return { level: "bad", title: "알림이 꺼져 있어요", text: "일정 알림을 받으려면 권한을 켜 주세요.", action: ["ask-perm", "알림 켜기"] };
+  if (perm.channelBlocked) return { level: "bad", title: "선택한 알림 방식이 차단돼 있어요", text: "설정 → 애플리케이션 → 서울 1박 2일 → 알림에서 켜 주세요.", action: null };
+  if (sched.kind === "fail") return { level: "bad", title: "알림을 예약하지 못했어요", text: "앱을 닫았다가 다시 열어 주세요.", action: null };
+  if (sched.kind === "missing") return { level: "bad", title: `알림 ${sched.missing}개를 예약하지 못했어요`, text: "앱을 닫았다가 다시 열어 주세요.", action: null };
+  if (perm.exact === "denied") return { level: "warn", title: "알림이 늦게 올 수 있어요", text: "「알람 및 리마인더」를 켜면 제시간에 와요.", action: ["ask-exact", "정확한 시각 알림 켜기"] };
+  return { level: "ok", title: NATIVE ? "알림 켜짐" : "미리보기", text: "", action: null };
 }
-$("#banner").addEventListener("click", async (e) => {
-  if (e.target.id === "ask-perm") {
+function nextAlarmText() {
+  const a = lastScheduled[0];
+  return a ? `다음 알림 ${hhmm(a.at)} · ${a.title}` : "남은 알림이 없어요.";
+}
+function renderPerm() {
+  const s = statusInfo();
+  const count = sched.kind === "ok" ? `예약 ${sched.n}개` : sched.kind === "preview" ? `미리보기 ${lastScheduled.length}개` : "";
+  const btn = s.action ? `<button type="button" class="btn" data-act="${s.action[0]}">${s.action[1]}</button>` : "";
+  $("#status-card").className = `settings-card status-card ${s.level}`;
+  $("#status-card").innerHTML = s.level === "ok"
+    ? `<p class="status-title">✅ ${s.title}${count ? ` · ${count}` : ""}</p><p class="muted">${esc(nextAlarmText())}</p>`
+    : `<p class="status-title">⚠️ ${s.title}</p><p>${s.text}</p>${btn}`;
+  // 홈 화면 배너는 문제 있을 때만
+  const banner = $("#banner");
+  banner.hidden = s.level === "ok";
+  banner.innerHTML = s.level === "ok" ? "" : `<span>${s.title}</span>${s.action ? `<button type="button" data-act="${s.action[0]}">${s.action[0] === "ask-perm" ? "켜기" : "설정"}</button>` : ""}`;
+  $("#bell-dot").hidden = s.level === "ok";
+  const d = $("#status-detail");
+  if (d) d.textContent = NATIVE
+    ? `상태: 알림 권한 ${perm.display === "granted" ? "켜짐" : "꺼짐"} · 정확한 시각 ${perm.exact === "denied" ? "꺼짐" : "켜짐"}${sched.err ? ` · 오류 ${sched.err}` : ""}`
+    : "브라우저 미리보기에서는 실제 알림을 예약하지 않아요.";
+}
+async function onStatusAction(act) {
+  if (act === "ask-perm") {
     await ensurePermissions(true);
     if (perm.display !== "granted" && NATIVE) alert("휴대폰 설정 → 애플리케이션 → 서울 1박 2일 → 알림에서 켜 주세요.");
     schedule();
   }
-  if (e.target.id === "ask-exact") {
+  if (act === "ask-exact") {
     try { await LocalNotifications.changeExactNotificationSetting(); } catch { /* 설정 화면이 없는 버전 */ }
   }
-});
+}
+for (const el of [$("#banner"), $("#status-card")]) {
+  el.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) onStatusAction(b.dataset.act); });
+}
 
 let lastScheduled = [];
-let schedState = "미리보기";
 // 재예약을 한 줄로 세운다. 설정을 빠르게 바꿔도 앞 작업이 끝난 뒤 최신 설정으로 다시 한다(Codex 검토 5).
 let chain = Promise.resolve();
 function schedule() {
@@ -384,8 +394,8 @@ function computeList() {
 async function doSchedule() {
   let list = computeList();
   lastScheduled = list;
-  if (!NATIVE) { schedState = "미리보기"; renderSched(); return; }
-  if (perm.display !== "granted") { schedState = "권한 없음 — 예약 안 됨"; renderSched(); return; }
+  if (!NATIVE) { sched = { kind: "preview", n: list.length, missing: 0, err: "" }; renderSched(); return; }
+  if (perm.display !== "granted") { sched = { kind: "noperm", n: 0, missing: 0, err: "" }; renderSched(); return; }
   try {
     const channelId = await ensureChannel();
     const pending = (await LocalNotifications.getPending()).notifications;
@@ -396,7 +406,7 @@ async function doSchedule() {
     lastScheduled = list;
     const keep = new Set(list.map((a) => a.id));
     // 새 목록에 없는 것만 지운다. 같은 id는 schedule이 덮어쓴다. 시험 알림과, 시각이 막 지나 아직 대기 중인
-    // (늦게 울릴) 알림은 남긴다 — 전부 지우면 앱을 연 순간 늦은 알림이 사라진다(Codex 2차 검토 1).
+    // (늦게 울릴) 알림은 남긴다. 전부 지우면 앱을 연 순간 늦은 알림이 사라진다(Codex 2차 검토 1).
     const drop = pending.filter((p) => {
       if (p.id === TEST_ID || keep.has(p.id)) return false;
       const at = p.schedule && p.schedule.at ? new Date(p.schedule.at).getTime() : NaN;
@@ -416,18 +426,17 @@ async function doSchedule() {
     const after = (await LocalNotifications.getPending()).notifications;
     const ids = new Set(after.map((p) => p.id));
     const missing = list.filter((a) => !ids.has(a.id)).length;
-    schedState = missing ? `예약 불일치: ${missing}개 빠짐` : `예약 확인 ${list.length}개`;
-    if (perm.channelBlocked) schedState = "채널이 꺼져 있어 울리지 않음";
+    sched = missing ? { kind: "missing", n: list.length - missing, missing, err: "" } : { kind: "ok", n: list.length, missing: 0, err: "" };
   } catch (err) {
     console.error("알림 예약 실패", err);
-    schedState = `예약 실패: ${err && err.message ? err.message : err}`;
+    sched = { kind: "fail", n: 0, missing: 0, err: String(err && err.message ? err.message : err) };
   }
   renderSched();
 }
 
 function renderSched() {
-  $("#sched-count").textContent = `${lastScheduled.length}개 · ${schedState}`;
-  $("#sched-count").className = /실패|불일치|권한/.test(schedState) ? "bad-text" : "muted";
+  renderPerm();
+  $("#sched-title").textContent = `예약된 알림 ${lastScheduled.length}개`;
   // 날짜가 바뀌는 곳에 일자 머리줄을 넣어 1일차·2일차를 가른다.
   let lastDate = "";
   $("#sched-list").innerHTML = lastScheduled.length
@@ -439,17 +448,32 @@ function renderSched() {
       lastDate = dIso;
       return `${head}<li><b>${hhmm(a.at)}</b><span>${esc(a.title)}</span></li>`;
     }).join("")
-    : `<li class="muted">남은 알림이 없습니다.</li>`;
+    : `<li class="muted">남은 알림이 없어요.</li>`;
 }
 
-/* 시점: 칩을 여러 개 고른다. 직접 입력한 값은 칩으로 더해지고 고른 상태가 된다. */
+/* 알림 시간: 칩을 여러 개 고른다. 직접 입력한 값은 칩으로 더해지고 고른 상태가 된다. */
+const leadLabel = (m) => (m === 0 ? "시작 시간" : m % 60 === 0 ? `${m / 60}시간 전` : `${m}분 전`);
+// 받침이 있으면 「과」, 없으면 「와」
+const josaGwa = (w) => { const c = w.charCodeAt(w.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? "과" : "와"; };
+// [30, 10] → 「시작 30분 전과 10분 전에 알려요.」, [0] → 「시작할 때 알려요.」
+function leadSummary(ls) {
+  if (ls.length > 3) return `알림 시간을 ${ls.length}개 골랐어요.`;
+  const w = ls.map((m) => (m === 0 ? "시작할 때" : leadLabel(m)));
+  const joined = w.length === 1 ? w[0] : w.length === 2 ? `${w[0]}${josaGwa(w[0])} ${w[1]}` : `${w[0]}, ${w[1]}, ${w[2]}`;
+  const head = w[0] === "시작할 때" ? "" : "시작 ";
+  return `${head}${joined}${w[w.length - 1] === "시작할 때" ? "" : "에"} 알려요.`;
+}
 function renderLeads() {
   $("#lead-chips").innerHTML = leadOptions.map((m) =>
-    `<label><input type="checkbox" value="${m}" ${leads.includes(m) ? "checked" : ""}>${m === 0 ? "정각" : `${m}분 전`}</label>`).join("");
-  $("#lead-note").textContent = leads.length
-    ? `일정마다 ${leads.length}번 울립니다(시작 시각 기준). 기차는 1시간 전 알림이 항상 더해집니다.`
-    : "고른 시점이 없어 알림이 울리지 않습니다.";
-  $("#lead-note").className = leads.length ? "muted small" : "bad-text small";
+    `<label><input type="checkbox" value="${m}" ${leads.includes(m) ? "checked" : ""}>${leadLabel(m)}</label>`).join("");
+  const note = $("#lead-note");
+  if (!leads.length) {
+    note.innerHTML = "<b>시작 전 알림을 껐어요.</b><br>출발 알림과 기차 알림은 따로 울려요.";
+    note.className = "note bad-text";
+  } else {
+    note.textContent = leadSummary(leads);
+    note.className = "note";
+  }
 }
 function saveLeads() {
   store.set("leads", leads);
@@ -465,9 +489,9 @@ $("#lead-chips").addEventListener("change", (e) => {
 $("#lead-add").addEventListener("click", () => {
   const input = $("#lead-input");
   const v = Math.round(Number(input.value));
-  if (!input.value || !Number.isFinite(v) || v < 0 || v > 600) { input.setCustomValidity("0~600 사이 숫자"); input.reportValidity(); return; }
+  if (!input.value || !Number.isFinite(v) || v < 0 || v > 600) { input.setCustomValidity("0~600 사이의 숫자를 입력해 주세요."); input.reportValidity(); return; }
   input.setCustomValidity("");
-  if (!leads.includes(v) && leads.length >= MAX_LEADS) { alert(`시점은 ${MAX_LEADS}개까지 고를 수 있습니다.`); return; }
+  if (!leads.includes(v) && leads.length >= MAX_LEADS) { alert(`알림 시간은 ${MAX_LEADS}개까지 고를 수 있어요.`); return; }
   leadOptions = normalizeLeads([...leadOptions, v]);
   leads = normalizeLeads([...leads, v]);
   input.value = "";
@@ -478,9 +502,9 @@ $("#lead-add").addEventListener("click", () => {
 function renderKinds() {
   for (const k of ["sound", "vibrate", "popup"]) $(`#kind-${k}`).checked = !!kinds[k];
   const none = !kinds.sound && !kinds.vibrate && !kinds.popup;
-  $("#kind-note").textContent = none
-    ? "모두 끄면 알림 목록에만 조용히 쌓입니다."
-    : "팝업은 화면 위에 잠깐 뜨는 알림입니다. 폰이 무음·방해 금지면 소리는 나지 않습니다.";
+  $("#kind-note").innerHTML = none
+    ? "<b>소리·진동·팝업을 모두 껐어요.</b><br>알림은 휴대폰 알림 목록에만 표시돼요."
+    : `팝업은 화면 위에 잠깐 떠요.<br><span class="nowrap">무음·방해 금지</span> 설정에 따라 소리가 나지 않을 수 있어요.`;
 }
 $("#kind-chips").addEventListener("change", (e) => {
   const k = e.target.dataset.kind; if (!k) return;
@@ -495,23 +519,31 @@ $("#depart-alarm").addEventListener("change", (e) => {
   schedule();
 });
 
-/* 일정별 알림 목록: 일자마다 모두 켜기/끄기, 항목마다 스위치. 지난 일정은 뺀다. */
+/* 일정별 켜고 끄기: 접힌 카드 안. 일자마다 모두 켜기/끄기, 항목마다 스위치. 지난 일정은 뺀다. */
+// 일정 사이 이동 줄: 소요 시간만 보여 준다(스위치 없음).
+function moveLine(mv) {
+  const parts = [mv.mode, mv.detail, mv.min ? `${mv.min}분` : ""].filter(Boolean).map(esc).join(" · ");
+  return `<div class="item-move">${MOVE_ICON[mv.mode] || "➜"} ${parts}</div>`;
+}
 function renderItemList() {
   const n = now();
+  let total = 0, onTotal = 0;
   $("#item-list").innerHTML = T.days.map((d) => {
     const rows = d.items.map((it) => ({ it, key: itemKey(d, it), start: startOf(d, it) })).filter((r) => r.start > n);
     if (!rows.length) return "";
     const onCount = rows.filter((r) => !disabled.has(r.key)).length;
+    total += rows.length; onTotal += onCount;
     return `<div class="item-day" style="--dc: var(--day${((d.day - 1) % 2) + 1})">
-      <div class="item-day-band"><b>${d.day}일차</b><span>${mdw(d.date)} · ${esc(d.title)}</span></div>
-      <div class="item-day-head"><span class="muted small">${onCount}/${rows.length}개 켬</span>
+      <div class="item-day-band"><b>${d.day}일차 · ${mdw(d.date)}</b><span>${esc(d.title)}</span></div>
+      <div class="item-day-head"><span class="muted">${rows.length}개 중 ${onCount}개 켜짐</span>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="1">모두 켜기</button>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="0">모두 끄기</button></div>
-      ${rows.map((r) => `<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}</span>
-        <span class="n">${esc(r.it.name)}${isCritical(r.it) ? ` <span class="chip must">놓치면 안 됨</span>` : ""}</span>
+      ${rows.map((r, k) => `${k > 0 && r.it.move ? moveLine(r.it.move) : ""}<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}</span>
+        <span class="n">${esc(r.it.name)}${isCritical(r.it) ? ` <span class="chip must">중요</span>` : ""}</span>
         ${switchHtml(r.key, !disabled.has(r.key))}</div>`).join("")}
     </div>`;
-  }).join("") || `<p class="muted small">남은 일정이 없습니다.</p>`;
+  }).join("") || `<p class="muted">남은 일정이 없어요.</p>`;
+  $("#items-summary").textContent = total ? `${total}개 중 ${onTotal}개 켜짐` : "";
 }
 $("#item-list").addEventListener("change", (e) => {
   const k = e.target.dataset.key; if (k == null) return;
@@ -526,7 +558,7 @@ $("#item-list").addEventListener("click", (e) => {
 });
 
 $("#test-alarm").addEventListener("click", async () => {
-  if (!NATIVE) { alert("시험 알림은 설치한 앱에서만 됩니다."); return; }
+  if (!NATIVE) { alert("시험 알림은 설치한 앱에서만 할 수 있어요."); return; }
   await ensurePermissions(true);
   if (perm.display !== "granted") { alert("알림 권한을 먼저 켜 주세요."); return; }
   const channelId = await ensureChannel();
@@ -534,12 +566,13 @@ $("#test-alarm").addEventListener("click", async () => {
   const ld = leads[leads.length - 1] ?? 10;
   await LocalNotifications.schedule({
     notifications: [{
-      id: TEST_ID, title: `시험 · ${alarmTitle(first)}`, body: `${ld === 0 ? "지금" : `${ld}분 전`} — 이렇게 일정 알림이 옵니다. 앱을 닫아 둬도 울립니다.`,
+      id: TEST_ID, title: `시험 · ${alarmTitle(first)}`, body: `${ld === 0 ? "지금" : `${ld}분 전`}\n이렇게 일정 알림이 와요. 앱을 닫아 둬도 울려요.`,
       ...(channelId ? { channelId } : {}), schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true },
     }],
   });
-  $("#test-alarm").textContent = "10초 뒤에 울립니다 — 앱을 닫아 보세요";
-  setTimeout(() => { $("#test-alarm").textContent = "10초 뒤 시험 알림"; }, 12000);
+  $("#test-alarm").textContent = "시험 알림 예약됨";
+  $("#test-note").textContent = "10초 뒤에 알려요. 앱을 닫아 봐도 돼요.";
+  setTimeout(() => { $("#test-alarm").textContent = "알림 시험하기"; $("#test-note").textContent = "누르면 10초 뒤에 알려요."; }, 12000);
 });
 
 $("#open-settings").addEventListener("click", () => {

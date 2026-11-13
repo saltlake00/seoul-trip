@@ -68,41 +68,69 @@
         <h2>일정 알림</h2>
         <button class="text-btn" value="close">닫기</button>
       </div>
-      <p class="muted">일정 <b>시작 시각</b> 기준으로 알립니다. 알림에는 「예약 17:30 · 16:50 출발(택시 40분)」처럼 출발 시각도 함께 나옵니다. 앱을 닫아도 울리지만, 설정에서 「강제 중지」하면 울리지 않습니다.</p>
 
-      <h3>몇 분 전에 알릴까요 <span class="muted small">여러 개 고를 수 있어요</span></h3>
-      <div class="chips" id="lead-chips" role="group" aria-label="알림 시점"></div>
-      <div class="lead-add">
-        <input id="lead-input" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="직접 입력 (분)">
-        <button type="button" class="btn secondary" id="lead-add">추가</button>
-      </div>
-      <p id="lead-note" class="muted small"></p>
-      <label class="switch row-switch"><input type="checkbox" id="depart-alarm"><span class="track" aria-hidden="true"></span>
-        <span class="lbl">이동이 있는 일정은 <b>출발 시각</b>에도 「지금 출발」 알림</span></label>
+      <!-- 1. 상태: 항상 맨 위. 조치 버튼도 여기 둔다 -->
+      <section class="settings-card status-card" id="status-card" aria-live="polite"></section>
 
-      <h3>어떻게 알릴까요 <span class="muted small">여러 개 고를 수 있어요</span></h3>
-      <div class="chips" id="kind-chips" role="group" aria-label="알림 방식">
-        <label><input type="checkbox" id="kind-sound" data-kind="sound">🔔 소리</label>
-        <label><input type="checkbox" id="kind-vibrate" data-kind="vibrate">📳 진동</label>
-        <label><input type="checkbox" id="kind-popup" data-kind="popup">💬 팝업</label>
-      </div>
-      <p id="kind-note" class="muted small"></p>
-      <div id="perm-status" class="perm"></div>
-      <h3>일정별 알림 <span class="muted small">안 갈 일정은 꺼 두세요</span></h3>
-      <div id="item-list"></div>
+      <!-- 2. 알림 시간 -->
+      <section class="settings-card">
+        <h3>알림 시간</h3>
+        <p class="muted">일정 시작 전에 알려요. 여러 시간을 고를 수 있어요.</p>
+        <div class="chips" id="lead-chips" role="group" aria-label="알림 시간"></div>
+        <details class="more">
+          <summary>다른 시간 추가</summary>
+          <label class="field-label" for="lead-input">시작 몇 분 전인가요?</label>
+          <div class="lead-add">
+            <input id="lead-input" type="number" inputmode="numeric" min="0" max="600" step="1" placeholder="예: 20">
+            <button type="button" class="btn secondary" id="lead-add">추가</button>
+          </div>
+        </details>
+        <p id="lead-note" class="note"></p>
+        <label class="switch row-switch"><input type="checkbox" id="depart-alarm"><span class="track" aria-hidden="true"></span>
+          <span class="lbl"><strong>출발할 때도 알림</strong><small>이동이 있는 일정에만 적용해요.</small></span></label>
+        <p class="note muted">기차는 출발 1시간 전에도 알려요.</p>
+      </section>
 
-      <button type="button" class="btn" id="test-alarm">10초 뒤 시험 알림</button>
-      <h3>예약된 알림 <span class="muted" id="sched-count"></span></h3>
-      <ul class="sched" id="sched-list"></ul>
-      <div class="info-card tips">
-        <h3>알림이 안 오거나 늦을 때</h3>
-        <ul class="small">
-          <li>설정 → 애플리케이션 → 서울 1박 2일 → 배터리 → <b>「제한 없음」</b></li>
-          <li>삼성: 설정 → 배터리 → 백그라운드 사용 제한 → <b>「사용하지 않는 앱 자동 절전」·「초절전 앱」 목록에서 빼기</b></li>
-          <li>설정 → 애플리케이션 → 서울 1박 2일 → <b>「알람 및 리마인더」 허용</b></li>
-          <li>최근 앱에서 밀어 닫는 것은 괜찮지만, 「강제 중지」는 예약을 지웁니다. 그랬다면 앱을 한 번 열면 다시 예약됩니다.</li>
-        </ul>
-      </div>
+      <!-- 3. 알림 방식 + 시험 -->
+      <section class="settings-card">
+        <h3>알림 방식</h3>
+        <p class="muted">여러 방식을 함께 켤 수 있어요.</p>
+        <div class="chips" id="kind-chips" role="group" aria-label="알림 방식">
+          <label><input type="checkbox" id="kind-sound" data-kind="sound">🔔 소리</label>
+          <label><input type="checkbox" id="kind-vibrate" data-kind="vibrate">📳 진동</label>
+          <label><input type="checkbox" id="kind-popup" data-kind="popup">💬 팝업</label>
+        </div>
+        <p id="kind-note" class="note muted"></p>
+        <button type="button" class="btn" id="test-alarm">알림 시험하기</button>
+        <p class="note muted" id="test-note">누르면 10초 뒤에 알려요.</p>
+      </section>
+
+      <!-- 4~6. 긴 목록과 도움말은 접어 둔다 -->
+      <details class="settings-card fold" id="fold-items">
+        <summary><span>일정별로 켜고 끄기</span><small id="items-summary"></small></summary>
+        <p class="muted">알림을 받지 않을 일정은 꺼 주세요.</p>
+        <div id="item-list"></div>
+      </details>
+
+      <details class="settings-card fold">
+        <summary><span id="sched-title">예약된 알림</span></summary>
+        <ul class="sched" id="sched-list"></ul>
+      </details>
+
+      <details class="settings-card fold">
+        <summary><span>알림이 안 오나요?</span></summary>
+        <div class="help">
+          <h4>배터리 제한을 풀어 주세요</h4>
+          <p>설정 → 애플리케이션 → 서울 1박 2일 → 배터리 → <b>「제한 없음」</b></p>
+          <p class="muted">삼성은 설정 → 배터리 → 백그라운드 사용 제한에서 이 앱을 <b>「사용하지 않는 앱 자동 절전」</b>과 <b>「초절전 앱」</b> 목록에서 빼 주세요.</p>
+          <h4>알림이 늦게 오면</h4>
+          <p>설정 → 애플리케이션 → 서울 1박 2일 → <b>「알람 및 리마인더」</b>를 허용해 주세요.</p>
+          <h4>앱을 닫았을 때</h4>
+          <p>앱을 닫아도 알림을 받을 수 있어요. 최근 앱에서 밀어 닫는 것은 괜찮지만 「강제 중지」를 하면 예약이 지워져요.</p>
+          <p class="muted">「강제 중지」를 했다면 앱을 다시 한 번 열어 주세요. 그러면 다시 예약돼요.</p>
+          <p class="muted" id="status-detail"></p>
+        </div>
+      </details>
     </form>
   </dialog>
 

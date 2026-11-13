@@ -301,3 +301,63 @@ main { padding: 0 16px; }
 .tips h3 { margin: 0 0 6px; }
 
 .leaflet-container { font: inherit; }
+
+/* ---------- 설정 시트 (Codex 3차 검토 반영: 상태 → 짧은 설정 카드 → 접힌 목록·도움말) ---------- */
+#settings { max-height: 88vh; max-height: 88dvh; font-size: 16px; line-height: 1.55; }
+#settings .sheet-body { padding-top: 0; }
+#settings .sheet-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding: 16px 0 10px; }
+#settings h2 { font-size: 20px; }
+#settings h3 { margin: 0 0 4px; font-size: 17px; }
+#settings .small { font-size: 14px; }
+#settings .text-btn { min-height: 44px; }
+.settings-card { padding: 16px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.settings-card > p { margin: 4px 0 0; }
+.settings-card .note { margin: 10px 0 0; font-size: 15px; }
+#settings .chips { gap: 8px; margin: 12px 0 0; }
+#settings .chips label {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px;
+  padding: 8px 16px; font-size: 15px; white-space: nowrap;
+}
+#settings .btn { margin-top: 14px; min-height: 48px; }
+.nowrap { white-space: nowrap; }
+
+/* 상태 카드 */
+.status-card .status-title { margin: 0; font-size: 16px; font-weight: 800; }
+.status-card p + p { margin-top: 4px; }
+.status-card.bad, .status-card.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: transparent; border-left: 4px solid var(--warn-ink); }
+.status-card.ok { background: var(--surface-2); border-color: transparent; }
+.status-card .btn { background: var(--warn-ink); color: var(--warn-bg); }
+
+/* 스위치 줄: 라벨·설명 왼쪽, 조작부 오른쪽 */
+#settings .row-switch {
+  display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 12px; align-items: center;
+  min-height: 64px; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink);
+}
+#settings .row-switch .lbl { order: -1; min-width: 0; font-weight: 400; }
+#settings .row-switch .lbl strong { display: block; font-size: 16px; }
+#settings .row-switch .lbl small { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); }
+#settings .row-switch .track { justify-self: end; }
+#settings .switch { min-height: 48px; }
+
+/* 직접 입력: 접어 둠 */
+.more { margin-top: 10px; }
+.more summary, .fold > summary { cursor: pointer; min-height: 48px; display: flex; align-items: center; font-weight: 700; color: var(--accent); }
+.field-label { display: block; margin: 4px 0 6px; font-size: 15px; }
+.lead-add input { min-height: 48px; font-size: 16px; }
+
+/* 접힌 카드 */
+.fold > summary { list-style: none; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 17px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "▾"; color: var(--muted); transition: transform .15s; }
+.fold[open] > summary::after { transform: rotate(180deg); }
+.fold > summary small { margin-left: auto; font-size: 14px; font-weight: 500; color: var(--muted); }
+.fold[open] > summary { margin-bottom: 8px; }
+.help h4 { margin: 14px 0 4px; font-size: 16px; }
+.help h4:first-child { margin-top: 0; }
+.help p { margin: 0 0 6px; font-size: 15px; }
+
+/* 일자 머리: 두 줄(일차·날짜 / 지역) */
+.item-day-band { flex-wrap: wrap; row-gap: 2px; }
+.item-day-band span { flex-basis: 100%; white-space: normal; overflow: visible; }
+.item-day-head .muted { font-size: 14px; }
+.item-move { padding: 4px 14px 4px 68px; font-size: 13.5px; color: var(--muted); border-top: 1px dashed var(--line); background: color-mix(in srgb, var(--surface-2) 50%, transparent); }

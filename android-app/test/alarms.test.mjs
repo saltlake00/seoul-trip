@@ -113,10 +113,13 @@ test("알림 방식 채널: 조합마다 다른 id, 소리 끄면 무음 파일,
   assert.equal(channelFor({ sound: false, vibrate: false, popup: false }).importance, 2);
 });
 
-test("놓치면 안 되는 일정: 집결·방탈출·아리아·연극", () => {
-  const names = items.filter(({ it }) => isCritical(it)).map(({ it }) => it.name);
-  for (const w of ["용산역", "괴담저장소", "아리아", "마피아게임"]) assert.ok(names.some((n) => n.includes(w)), w);
-  assert.ok(!names.some((n) => n.includes("국립중앙박물관")));
+test("놓치면 안 되는 일정: 예약 3개(괴담·아리아·마피아게임)와 기차 출발 2개만", () => {
+  const T2 = withDepartures(TRIP);
+  const names = T2.days.flatMap((d) => d.items.filter(isCritical).map((it) => it.name));
+  assert.equal(names.length, 5, names.join(", "));
+  for (const w of ["괴담저장소", "아리아", "마피아게임", "광주 : 광주→용산", "광주 : 용산→광주"]) assert.ok(names.some((n) => n.includes(w)), w);
+  for (const w of ["도파민스테이션", "국립중앙박물관"]) assert.ok(!names.some((n) => n.includes(w)), w);
+  assert.ok(!names.includes("용산역"), "집결 도착은 빠짐");
 });
 
 test("출발 상태: 방탈출 14:20이면 10분 남음, 14:35면 5분 지남", () => {

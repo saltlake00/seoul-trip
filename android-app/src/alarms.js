@@ -168,10 +168,10 @@ export function withDepartures(trip) {
   return { ...trip, days };
 }
 
-// 놓치면 안 되는 일정: 예약이 걸렸거나(reserve), 집결·출발·해산(기차), 메모에 「불가」「KTX」가 있는 것.
-// 단체 여행에서 흔한 실수가 집결·출발 시각을 도착 시각으로 착각하는 것이라 화면에 따로 표시한다.
+// 놓치면 안 되는 일정: 예약한 것(reserve)과 기차 출발(type 「출발」)만. 집결 도착이나 메모에 「기차」가 있는
+// 일정은 넣지 않는다(사용자 기준 11-14 02:40: 「괴담·아리아·마피아게임 + 기차 출발만」).
 export function isCritical(item) {
-  return !!(item.reserve || item.type === "집결" || item.type === "출발" || item.type === "해산" || /불가|KTX|기차/.test(item.note || ""));
+  return !!(item.reserve || item.type === "출발");
 }
 
 // 출발 상태: 이동이 있는 일정의 출발 시각과 지금의 차이(분). 이동이 없으면 null.
