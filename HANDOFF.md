@@ -8,7 +8,7 @@
 ## 현재 상태
 
 - 앱: `android-app/` (화면 `src/main.js`, 알림 계산 `src/alarms.js`, 시험 `test/alarms.test.mjs` 19개, 세 시간대 통과).
-- 빌드: GitHub Actions `android-apk`가 `main` push마다 APK를 만든다. 최신 커밋은 773b869이고, 받은 APK는 `android-app/dist/`(gitignore)에 있다.
+- 빌드: GitHub Actions `android-apk`가 `main` push마다 APK를 만든다. 최신 커밋은 df6f01c이고, 받은 APK는 `android-app/dist/`(gitignore)에 있다.
 - 계획과 Codex 검토 1~3차(계획, 코드, 화면 문구·배치)의 반영 기록은 `docs/안드로이드-앱-계획.md` 9절에 있다.
 - 사용 설명과 알림 규칙은 `android-app/README.md`에 있다.
 
