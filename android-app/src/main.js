@@ -538,7 +538,7 @@ function renderItemList() {
       <div class="item-day-head"><span class="muted">${rows.length}개 중 ${onCount}개 켜짐</span>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="1">모두 켜기</button>
         <button type="button" class="text-btn" data-all="${d.day}" data-on="0">모두 끄기</button></div>
-      ${rows.map((r, k) => `${k > 0 && r.it.move ? moveLine(r.it.move) : ""}<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}</span>
+      ${rows.map((r, k) => `${k > 0 && r.it.move ? moveLine(r.it.move) : ""}<div class="item-row${disabled.has(r.key) ? " off" : ""}"><span class="t">${r.it.time}${r.it.end ? `<small>~${r.it.end}</small>` : ""}</span>
         <span class="n">${esc(r.it.name)}${isCritical(r.it) ? ` <span class="chip must">중요</span>` : ""}</span>
         ${switchHtml(r.key, !disabled.has(r.key))}</div>`).join("")}
     </div>`;
