@@ -4,3 +4,4 @@ dist/
 www/bundle.js
 www/data/
 www/vendor/
+keystore/

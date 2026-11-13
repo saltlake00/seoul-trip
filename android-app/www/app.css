@@ -208,8 +208,9 @@ main { padding: 0 16px; }
 .btn.secondary { background: var(--surface-2); color: var(--ink); }
 .text-btn { border: 0; background: transparent; color: var(--accent); font-weight: 700; padding: 6px; }
 .sheet {
-  border: 0; padding: 0; margin: auto 0 0; width: 100%; max-width: 100%;
-  max-height: 88vh; border-radius: 22px 22px 0 0; background: var(--surface); color: var(--ink);
+  position: fixed; inset: auto 0 0 0; border: 0; padding: 0; margin: 0; width: auto; max-width: none;
+  max-height: 88vh; overflow-y: auto; overscroll-behavior: contain;
+  border-radius: 22px 22px 0 0; background: var(--surface); color: var(--ink);
 }
 .sheet::backdrop { background: rgba(0, 0, 0, .4); }
 .sheet-body { padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); }
@@ -228,7 +229,7 @@ main { padding: 0 16px; }
 .perm button { margin-top: 8px; }
 .sched { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
 .sched li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
-.sched li b { font-variant-numeric: tabular-nums; flex: none; width: 92px; }
+.sched li b { font-variant-numeric: tabular-nums; flex: none; width: 116px; white-space: nowrap; }
 
 .bad-text { color: var(--warn-ink); font-weight: 700; }
 .tips { box-shadow: none; background: var(--surface-2); margin-top: 18px; }

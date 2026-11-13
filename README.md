@@ -6,6 +6,7 @@
 - 준비 현황 데이터: [`data/board.js`](data/board.js) → `plan.html` (결정 대기·예약 현황·후보 목록·회의 기록)
 - 회의 후 갱신 절차: [`docs/갱신-가이드.md`](docs/갱신-가이드.md)
 - 일행이 의견을 적을 노션 틀: [`docs/노션-틀.md`](docs/노션-틀.md)
+- 안드로이드 앱(일정 알림): [`android-app/`](android-app/README.md) — 같은 `data/trip.js`를 읽는다
 - 일정 플래너(편집 도구) 설계: [`docs/플래너-설계.md`](docs/플래너-설계.md) — 구현 전
 
 ## 구성

@@ -37,6 +37,12 @@ $("#title").textContent = T.title;
 $("#dates").textContent = `${T.dates.start} – ${T.dates.end}`;
 
 /* ---------- 지금/다음 카드 ---------- */
+// 이동이 필요한 일정이면 「출발 14:30 (택시 30분)」
+function departLine(e) {
+  const mv = e.item.move;
+  if (!mv || !mv.min) return "";
+  return `<br><b>출발 ${hhmm(new Date(e.start.getTime() - mv.min * 60000))}</b> (${esc(mv.mode)} ${mv.min}분)`;
+}
 function renderNow() {
   const n = now();
   const { current, next, first, last } = nowAndNext(T, n);
@@ -50,13 +56,13 @@ function renderNow() {
       <h2>${esc(current.item.name)}</h2>
       <div class="when">${current.item.time}${end}</div>
       <div class="row">${nav(current)}</div>
-      ${next ? `<div class="next">다음 <b>${next.item.time}</b> ${esc(next.item.name)} · ${untilText(next.start, n)}</div>` : ""}`;
+      ${next ? `<div class="next">다음 <b>${next.item.time}</b> ${esc(next.item.name)} · ${untilText(next.start, n)}${departLine(next)}</div>` : ""}`;
   } else if (next) {
     const label = next === first ? "첫 일정까지" : "다음 일정";
     card.innerHTML = `
       <div class="label">${label} · ${untilText(next.start, n)}</div>
       <h2>${esc(next.item.name)}</h2>
-      <div class="when">${next.day.day}일차 ${mdw(next.day.date)} ${next.item.time}${next.item.end ? ` ~ ${next.item.end}` : ""}${next.item.move ? ` · ${esc(next.item.move.mode)}${next.item.move.min ? ` ${next.item.move.min}분` : ""}` : ""}</div>
+      <div class="when">${next.day.day}일차 ${mdw(next.day.date)} ${next.item.time}${next.item.end ? ` ~ ${next.item.end}` : ""}${departLine(next)}</div>
       <div class="row">${nav(next)}</div>`;
   } else {
     card.innerHTML = `
@@ -138,8 +144,10 @@ function renderMap() {
   $("#map-seg").innerHTML = segHtml(mapDay);
   if (!map) {
     map = L.map("map", { zoomControl: false, attributionControl: true });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: "© OpenStreetMap",
+    // OSM 타일 서버는 앱(https://localhost) 요청을 막을 수 있어 키가 필요 없는 Esri 지도를 쓴다.
+    // CARTO는 2026-11 확인 때 「API KEY REQUIRED」 타일을 돌려줬다.
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19, attribution: "Tiles © Esri",
     }).addTo(map);
     mapLayer = L.layerGroup().addTo(map);
   }
@@ -293,7 +301,7 @@ function renderSched() {
 }
 
 function renderLeads() {
-  $("#lead-chips").innerHTML = `<legend>언제 알릴까요</legend>` + LEADS.map((m) =>
+  $("#lead-chips").innerHTML = `<legend>여유 시간</legend>` + LEADS.map((m) =>
     `<label><input type="radio" name="lead" value="${m}" ${m === lead ? "checked" : ""}>${m === 0 ? "딱 맞춰" : `${m}분 여유`}</label>`).join("");
 }
 $("#lead-chips").addEventListener("change", (e) => {
