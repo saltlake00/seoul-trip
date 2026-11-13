@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘 전경: 흰 지도 핀. 108dp 캔버스, 가운데 66dp 안에 둔다. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M54,30c-10.5,0 -19,8.3 -19,18.6c0,14.2 19,33.4 19,33.4s19,-19.2 19,-33.4C73,38.3 64.5,30 54,30z"/>
+    <path android:fillColor="#4F46E5"
+        android:pathData="M46.6,48.4a7.4,7.4 0,1 0,14.8 0a7.4,7.4 0,1 0,-14.8 0z"/>
+</vector>

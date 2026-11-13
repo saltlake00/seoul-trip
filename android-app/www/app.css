@@ -149,6 +149,15 @@ main { padding: 0 16px; }
   color: var(--tc); background: color-mix(in srgb, var(--tc) 14%, transparent); margin-bottom: 6px;
 }
 .chip.cand { color: var(--muted); background: var(--surface-2); margin-left: 4px; }
+.chip.must { color: #dc2626; background: color-mix(in srgb, #dc2626 12%, transparent); margin-left: 4px; }
+.now-card .late { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-weight: 800; }
+.checks { display: grid; gap: 2px; }
+.checks label { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.checks label:last-child { border-bottom: 0; }
+.checks input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.checks input:checked + span { color: var(--muted); text-decoration: line-through; }
+.sos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sos a { display: block; text-align: center; padding: 12px 8px; border-radius: 12px; background: var(--surface-2); color: var(--ink); text-decoration: none; font-weight: 700; font-size: 14px; }
 .tl .note { margin: 6px 0 0; font-size: 13.5px; color: var(--muted); }
 .tl .meta { margin: 6px 0 0; font-size: 13px; }
 .tl .actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
@@ -232,6 +241,15 @@ main { padding: 0 16px; }
 .sched li b { font-variant-numeric: tabular-nums; flex: none; width: 116px; white-space: nowrap; }
 
 .bad-text { color: var(--warn-ink); font-weight: 700; }
+.lead-add { display: flex; gap: 8px; margin: 4px 0 6px; }
+.lead-add input {
+  flex: 1; min-width: 0; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  font: inherit; background: var(--surface); color: var(--ink);
+}
+.lead-add input:focus { outline: none; border-color: var(--accent); }
+.lead-add .btn { width: auto; padding: 10px 18px; }
+.sheet .chips { margin: 8px 0 4px; }
+.sheet h3 .small { font-weight: 500; }
 .tips { box-shadow: none; background: var(--surface-2); margin-top: 18px; }
 .tips h3 { margin: 0 0 6px; }
 

@@ -3,12 +3,15 @@ import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { App } from "@capacitor/app";
 import L from "leaflet";
-import { buildAlarms, startOf, endOf, itemKey, nowAndNext, untilText, leadText } from "./alarms.js";
+import {
+  buildAlarms, startOf, endOf, itemKey, nowAndNext, untilText, normalizeLeads, channelFor, alarmTitle,
+  isCritical, departState, prepAlarm, TEST_ID, MAX_LEADS,
+} from "./alarms.js";
 
 const T = window.TRIP;
 const NATIVE = Capacitor.isNativePlatform();
-const CHANNEL = "trip-schedule";
-const LEADS = [0, 5, 10, 30];
+// 기본 시점 칩. 직접 입력한 값은 칩으로 더해져 저장된다.
+const PRESET_LEADS = [10, 30];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -22,8 +25,11 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 무시 */ } },
 };
-let lead = store.get("lead", 10);
+let leads = normalizeLeads(store.get("leads", [30, 10]));        // 고른 시점(분 전)
+let leadOptions = normalizeLeads([...PRESET_LEADS, ...store.get("leadOptions", []), ...leads]); // 칩으로 보일 시점
+let kinds = Object.assign({ sound: true, vibrate: true, popup: true }, store.get("kinds", {})); // 알림 방식
 let disabled = new Set(store.get("disabled", []));
+let checked = new Set(store.get("checked", []));                  // 챙긴 준비물
 
 const kakaoTo = (it) => `https://map.kakao.com/link/to/${encodeURIComponent(it.name)},${it.lat},${it.lng}`;
 const hhmm = (d) => d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
@@ -37,11 +43,15 @@ $("#title").textContent = T.title;
 $("#dates").textContent = `${T.dates.start} – ${T.dates.end}`;
 
 /* ---------- 지금/다음 카드 ---------- */
-// 이동이 필요한 일정이면 「출발 14:30 (택시 30분)」
+// 이동이 필요한 일정이면 「출발 14:30 (택시 30분) · 12분 남음」, 출발 시각이 지났으면 경고.
 function departLine(e) {
+  const st = departState(e.day, e.item, now());
+  if (!st) return "";
   const mv = e.item.move;
-  if (!mv || !mv.min) return "";
-  return `<br><b>출발 ${hhmm(new Date(e.start.getTime() - mv.min * 60000))}</b> (${esc(mv.mode)} ${mv.min}분)`;
+  const tail = st.late
+    ? ` <span class="late">출발 시각 ${st.late}분 지남</span>`
+    : st.left <= 120 ? ` · ${st.left}분 남음` : "";
+  return `<br><b>출발 ${hhmm(st.depart)}</b> (${esc(mv.mode)} ${mv.min}분)${tail}`;
 }
 function renderNow() {
   const n = now();
@@ -104,7 +114,7 @@ function renderTimeline() {
       <span class="node"></span>
       <div class="card">
         ${mv}
-        <span class="chip">${esc(it.type)}</span>${it.status === "후보" ? `<span class="chip cand">후보</span>` : ""}
+        <span class="chip">${esc(it.type)}</span>${isCritical(it) ? `<span class="chip must">놓치면 안 됨</span>` : ""}${it.status === "후보" ? `<span class="chip cand">후보</span>` : ""}
         <div class="head"><h3>${esc(it.name)}</h3></div>
         ${it.note ? `<p class="note">${esc(it.note)}</p>` : ""}
         ${extra ? `<p class="meta">${extra}</p>` : ""}
@@ -166,6 +176,13 @@ function renderMap() {
   });
   setTimeout(() => { map.invalidateSize(); map.fitBounds(pts, { padding: [36, 36] }); }, 0);
 }
+$("#info").addEventListener("change", (e) => {
+  const k = e.target.dataset.check; if (k == null) return;
+  if (e.target.checked) checked.add(k); else checked.delete(k);
+  store.set("checked", [...checked]);
+  renderInfo();
+  schedule(); // 준비물 알림 내용·유무가 바뀐다
+});
 $("#map-seg").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   mapDay = +b.dataset.i; renderMap();
@@ -180,7 +197,17 @@ function renderInfo() {
   if (s.name) parts.push(`<div class="info-card"><h2>숙소</h2><p><b>${esc(s.name)}</b></p><p class="muted">체크인 ${esc(s.checkin)}<br>체크아웃 ${esc(s.checkout)}</p></div>`);
   if (Array.isArray(T.transport) && T.transport.length) parts.push(`<div class="info-card"><h2>교통</h2>${list(T.transport)}</div>`);
   if (Array.isArray(T.pending) && T.pending.length) parts.push(`<div class="info-card"><h2>아직 정할 것</h2>${list(T.pending)}</div>`);
-  if (Array.isArray(T.checklist) && T.checklist.length) parts.push(`<div class="info-card"><h2>준비물</h2>${list(T.checklist)}</div>`);
+  if (Array.isArray(T.checklist) && T.checklist.length) {
+    const left = T.checklist.filter((x) => !checked.has(x)).length;
+    parts.push(`<div class="info-card"><h2>준비물 <span class="muted small">${left ? `${left}개 남음` : "다 챙김"}</span></h2>
+      <div class="checks">${T.checklist.map((x) => `<label><input type="checkbox" data-check="${esc(x)}" ${checked.has(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div>
+      <p class="muted small">첫 일정 3시간 전에 덜 챙긴 것을 알려 드립니다.</p></div>`);
+  }
+  // 비상 연락: 전화 앱으로 바로 건다.
+  parts.push(`<div class="info-card"><h2>급할 때</h2><div class="sos">
+    <a href="tel:112">🚓 경찰 112</a><a href="tel:119">🚑 화재·구급 119</a>
+    <a href="tel:1330">ℹ️ 관광안내 1330</a><a href="https://www.lost112.go.kr" target="_blank" rel="noopener">🔎 분실물 조회</a>
+  </div><p class="muted small">지하철 분실물은 역 고객안내센터, 택시는 카드 결제 내역의 차량 번호로 찾습니다.</p></div>`);
   parts.push(`<div class="info-card"><h2>웹 페이지</h2><p class="muted">일정이 바뀌면 웹 페이지가 먼저 바뀝니다. 준비 현황도 웹에서 봅니다.</p>
     <a class="btn secondary" href="https://saltlake00.github.io/seoul-trip/" target="_blank" rel="noopener">웹 일정표 열기</a></div>`);
   parts.push(`<p class="muted small">데이터 갱신 ${esc(T.updated)}</p>`);
@@ -202,8 +229,29 @@ document.querySelector(".tabbar").addEventListener("click", (e) => {
 });
 
 /* ---------- 알림 ---------- */
-let perm = { display: "prompt", exact: "unknown" };
-let channelOk = false; // 채널 생성에 실패하면 channelId 없이(플러그인 기본 채널) 예약한다. 없는 채널 id로 예약하면 안 뜬다.
+let perm = { display: "prompt", exact: "unknown", channelBlocked: false };
+// 알림 방식 조합마다 채널이 따로 있다(alarms.js channelFor). 만든 채널 id만 쓴다 — 없는 채널 id로 예약하면 안 뜬다.
+const madeChannels = new Set();
+const isAndroid = () => NATIVE && Capacitor.getPlatform() === "android";
+
+async function ensureChannel() {
+  const ch = channelFor(kinds);
+  if (!isAndroid()) return null;
+  try {
+    if (!madeChannels.has(ch.id)) { await LocalNotifications.createChannel(ch); madeChannels.add(ch.id); }
+    // 사용자가 시스템 설정에서 이 채널만 끄면 앱 권한은 켜져 있어도 안 뜬다. 중요도 0이면 꺼진 것(Codex 2차 검토 4).
+    try {
+      const { channels } = await LocalNotifications.listChannels();
+      const mine = channels.find((c) => c.id === ch.id);
+      perm.channelBlocked = !!mine && mine.importance === 0;
+    } catch { perm.channelBlocked = false; }
+    renderPerm();
+    return ch.id;
+  } catch (err) {
+    console.error("채널 생성 실패", err);
+    return null; // 플러그인 기본 채널로 예약
+  }
+}
 
 async function ensurePermissions(ask) {
   try {
@@ -211,15 +259,8 @@ async function ensurePermissions(ask) {
     if (p.display !== "granted" && ask) p = await LocalNotifications.requestPermissions();
     perm.display = p.display;
   } catch { perm.display = "denied"; }
-  if (NATIVE && Capacitor.getPlatform() === "android") {
+  if (isAndroid()) {
     try { perm.exact = (await LocalNotifications.checkExactNotificationSetting()).exact_alarm; } catch { perm.exact = "unknown"; }
-    // 중요도 4(HIGH)=화면 위 팝업+소리. 채널 설정은 만든 뒤 같은 id로는 바뀌지 않는다.
-    try {
-      await LocalNotifications.createChannel({
-        id: CHANNEL, name: "일정 알림", description: "일정 출발·시작 알림", importance: 4, visibility: 1, vibration: true,
-      });
-      channelOk = true;
-    } catch (err) { console.error("채널 생성 실패", err); channelOk = false; }
   }
   renderPerm();
 }
@@ -232,6 +273,11 @@ function renderPerm() {
     banner.hidden = false;
     banner.innerHTML = `<span>알림 권한이 꺼져 있어 일정 알림이 울리지 않습니다.</span><button id="ask-perm">켜기</button>`;
     box.className = "perm bad"; box.textContent = "알림 권한: 꺼짐";
+    dot.hidden = false;
+  } else if (perm.channelBlocked) {
+    banner.hidden = false;
+    banner.innerHTML = `<span>「${esc(channelFor(kinds).name)}」 알림 종류가 꺼져 있습니다. 설정 → 애플리케이션 → 서울 1박 2일 → 알림에서 켜 주세요.</span>`;
+    box.className = "perm bad"; box.textContent = "알림 종류 꺼짐 — 울리지 않음";
     dot.hidden = false;
   } else if (perm.exact === "denied") {
     banner.hidden = false;
@@ -263,28 +309,49 @@ function schedule() {
   chain = chain.then(doSchedule, doSchedule);
   return chain;
 }
+const OVERDUE_KEEP_MS = 30 * 60000; // 시각이 지났는데 아직 대기 중인 알림(절전으로 늦어진 것)은 30분 안이면 남긴다
+function computeList() {
+  const list = buildAlarms(T, { now: now(), leads, disabled });
+  const prep = prepAlarm(T, { now: now(), checked });
+  return prep ? [...list, prep].sort((a, b) => a.at - b.at) : list;
+}
 async function doSchedule() {
-  const list = buildAlarms(T, { now: now(), lead, disabled });
+  let list = computeList();
   lastScheduled = list;
   if (!NATIVE) { schedState = "미리보기"; renderSched(); return; }
   if (perm.display !== "granted") { schedState = "권한 없음 — 예약 안 됨"; renderSched(); return; }
   try {
-    // 앱이 예약한 것 전부(끈 항목·지난 설정 포함)를 지우고 새로 넣는다. 시험 알림(9999)은 남긴다.
-    const pending = await LocalNotifications.getPending();
-    const old = pending.notifications.filter((p) => p.id !== 9999);
-    if (old.length) await LocalNotifications.cancel({ notifications: old.map((p) => ({ id: p.id })) });
+    const channelId = await ensureChannel();
+    const pending = (await LocalNotifications.getPending()).notifications;
+    // 네이티브 호출 직전에 시각을 다시 거른다. 그 사이 지난 것은 플러그인이 등록하지 않는데 저장만 해서
+    // 「예약 확인」으로 잘못 보인다(Codex 2차 검토 2).
+    const cutoff = Date.now() + nowOffset + 3000;
+    list = list.filter((a) => a.at.getTime() > cutoff);
+    lastScheduled = list;
+    const keep = new Set(list.map((a) => a.id));
+    // 새 목록에 없는 것만 지운다. 같은 id는 schedule이 덮어쓴다. 시험 알림과, 시각이 막 지나 아직 대기 중인
+    // (늦게 울릴) 알림은 남긴다 — 전부 지우면 앱을 연 순간 늦은 알림이 사라진다(Codex 2차 검토 1).
+    const drop = pending.filter((p) => {
+      if (p.id === TEST_ID || keep.has(p.id)) return false;
+      const at = p.schedule && p.schedule.at ? new Date(p.schedule.at).getTime() : NaN;
+      const overdue = Number.isFinite(at) && at <= Date.now() + nowOffset && Date.now() + nowOffset - at < OVERDUE_KEEP_MS;
+      return !overdue;
+    });
+    if (drop.length) await LocalNotifications.cancel({ notifications: drop.map((p) => ({ id: p.id })) });
     if (list.length) {
       await LocalNotifications.schedule({
         notifications: list.map((a) => ({
           id: a.id, title: a.title, body: a.body, largeBody: a.largeBody, extra: a.extra,
-          ...(channelOk ? { channelId: CHANNEL } : {}),
+          ...(channelId ? { channelId } : {}),
           schedule: { at: a.at, allowWhileIdle: true },
         })),
       });
     }
-    const after = await LocalNotifications.getPending();
-    const n = after.notifications.filter((p) => p.id !== 9999).length;
-    schedState = n === list.length ? `예약 확인 ${n}개` : `예약 불일치: 계산 ${list.length}개, 실제 ${n}개`;
+    const after = (await LocalNotifications.getPending()).notifications;
+    const ids = new Set(after.map((p) => p.id));
+    const missing = list.filter((a) => !ids.has(a.id)).length;
+    schedState = missing ? `예약 불일치: ${missing}개 빠짐` : `예약 확인 ${list.length}개`;
+    if (perm.channelBlocked) schedState = "채널이 꺼져 있어 울리지 않음";
   } catch (err) {
     console.error("알림 예약 실패", err);
     schedState = `예약 실패: ${err && err.message ? err.message : err}`;
@@ -300,30 +367,72 @@ function renderSched() {
     : `<li class="muted">남은 알림이 없습니다.</li>`;
 }
 
+/* 시점: 칩을 여러 개 고른다. 직접 입력한 값은 칩으로 더해지고 고른 상태가 된다. */
 function renderLeads() {
-  $("#lead-chips").innerHTML = `<legend>여유 시간</legend>` + LEADS.map((m) =>
-    `<label><input type="radio" name="lead" value="${m}" ${m === lead ? "checked" : ""}>${m === 0 ? "딱 맞춰" : `${m}분 여유`}</label>`).join("");
+  $("#lead-chips").innerHTML = leadOptions.map((m) =>
+    `<label><input type="checkbox" value="${m}" ${leads.includes(m) ? "checked" : ""}>${m === 0 ? "정각" : `${m}분 전`}</label>`).join("");
+  $("#lead-note").textContent = leads.length
+    ? `일정마다 ${leads.length}번 울립니다. 이동이 있는 일정은 출발 시각 기준입니다.`
+    : "고른 시점이 없어 알림이 울리지 않습니다.";
+  $("#lead-note").className = leads.length ? "muted small" : "bad-text small";
+}
+function saveLeads() {
+  store.set("leads", leads);
+  store.set("leadOptions", leadOptions.filter((m) => !PRESET_LEADS.includes(m)));
+  renderLeads();
+  schedule();
 }
 $("#lead-chips").addEventListener("change", (e) => {
-  lead = +e.target.value; store.set("lead", lead); schedule();
+  const m = +e.target.value;
+  leads = normalizeLeads(e.target.checked ? [...leads, m] : leads.filter((x) => x !== m));
+  saveLeads();
+});
+$("#lead-add").addEventListener("click", () => {
+  const input = $("#lead-input");
+  const v = Math.round(Number(input.value));
+  if (!input.value || !Number.isFinite(v) || v < 0 || v > 600) { input.setCustomValidity("0~600 사이 숫자"); input.reportValidity(); return; }
+  input.setCustomValidity("");
+  if (!leads.includes(v) && leads.length >= MAX_LEADS) { alert(`시점은 ${MAX_LEADS}개까지 고를 수 있습니다.`); return; }
+  leadOptions = normalizeLeads([...leadOptions, v]);
+  leads = normalizeLeads([...leads, v]);
+  input.value = "";
+  saveLeads();
+});
+
+/* 방식: 소리·진동·팝업 각각 켜고 끈다. 바꾸면 그 조합의 채널로 다시 예약한다. */
+function renderKinds() {
+  for (const k of ["sound", "vibrate", "popup"]) $(`#kind-${k}`).checked = !!kinds[k];
+  const none = !kinds.sound && !kinds.vibrate && !kinds.popup;
+  $("#kind-note").textContent = none
+    ? "모두 끄면 알림 목록에만 조용히 쌓입니다."
+    : "팝업은 화면 위에 잠깐 뜨는 알림입니다. 폰이 무음·방해 금지면 소리는 나지 않습니다.";
+}
+$("#kind-chips").addEventListener("change", (e) => {
+  const k = e.target.dataset.kind; if (!k) return;
+  kinds[k] = e.target.checked;
+  store.set("kinds", kinds);
+  renderKinds();
+  schedule();
 });
 
 $("#test-alarm").addEventListener("click", async () => {
   if (!NATIVE) { alert("시험 알림은 설치한 앱에서만 됩니다."); return; }
   await ensurePermissions(true);
   if (perm.display !== "granted") { alert("알림 권한을 먼저 켜 주세요."); return; }
+  const channelId = await ensureChannel();
   const first = T.days[0].items[0];
+  const ld = leads[leads.length - 1] ?? 10;
   await LocalNotifications.schedule({
     notifications: [{
-      id: 9999, title: `시험 · ${leadText(lead)} · ${first.name}`, body: "이렇게 일정 알림이 옵니다. 앱을 닫아 둬도 울립니다.",
-      ...(channelOk ? { channelId: CHANNEL } : {}), schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true },
+      id: TEST_ID, title: `시험 · ${alarmTitle(first, 0, ld)}`, body: "이렇게 일정 알림이 옵니다. 앱을 닫아 둬도 울립니다.",
+      ...(channelId ? { channelId } : {}), schedule: { at: new Date(Date.now() + 10000), allowWhileIdle: true },
     }],
   });
   $("#test-alarm").textContent = "10초 뒤에 울립니다 — 앱을 닫아 보세요";
   setTimeout(() => { $("#test-alarm").textContent = "10초 뒤 시험 알림"; }, 12000);
 });
 
-$("#open-settings").addEventListener("click", () => { renderLeads(); renderSched(); $("#settings").showModal(); });
+$("#open-settings").addEventListener("click", () => { renderLeads(); renderKinds(); renderSched(); $("#settings").showModal(); });
 
 /* ---------- 시작 ---------- */
 function renderAll() { renderNow(); renderSeg(); renderTimeline(); }
@@ -340,6 +449,7 @@ if (NATIVE) {
   LocalNotifications.addListener("localNotificationActionPerformed", (a) => {
     const x = a.notification && a.notification.extra;
     if (x && x.day) jumpTo(x.day, x.index);
+    else if (x && x.view) showView(x.view); // 준비물 알림 → 정보 탭
   });
   // 앱으로 돌아올 때 권한·예약을 다시 맞춘다(설정에서 권한을 바꾸고 온 경우).
   App.addListener("appStateChange", async ({ isActive }) => {
